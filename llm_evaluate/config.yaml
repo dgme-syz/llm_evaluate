@@ -9,21 +9,22 @@ data:
   split:
     - train
     - train
+  num_samples: null
 
 evaluate:
   val_size: 64
-  num_proc: None
+  num_proc: null
   metrics:
     - BLEU
 
 use_server: false
 
 llm:
-  model: /home/nfs06/shenyz/models/Qwen3-8B
-  tokenizer: /home/nfs06/shenyz/models/Qwen3-8B
+  model: /home/nfs06/shenyz/models/Qwen2.5-7B-Instruct
+  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-7B-Instruct
   dtype: float16
   gpu_memory_utilization: 0.4
-  tensor_parallel_size: 4
+  tensor_parallel_size: 2
 
 server: {}
 
@@ -34,4 +35,5 @@ sample_params:
   online: {}
 
 
-
+save_outputs: true # save format: jsonl
+outputs_dir: ./outputs/
