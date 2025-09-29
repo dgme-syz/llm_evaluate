@@ -1,9 +1,16 @@
+import os
+
 import hydra
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
-from llm_evaluate.dataset.registry import get_dataset
+from llm_evaluate.dataset import get_dataset
 from llm_evaluate.vllm.utils import build_model
-from llm_evaluate.utils.metric.registry import get_metrics
+from llm_evaluate.utils.metric import get_metrics
+import torch
+import gc
+from vllm.distributed.parallel_state import cleanup_dist_env_and_memory
+
 
 def generate_batched(examples, llm):
     """
@@ -39,8 +46,10 @@ def main_evaluate(config: DictConfig):
     dataset_cls = get_dataset(dataset_name)
     dataset_obj = dataset_cls(data_path, subset_name=subset_name, split=split, builder=builder)
     data = dataset_obj.map(batched=False)
-
-    print("\nSample data:", data[:3])
+    
+    if config.data.get("num_samples", None) is not None:
+        data = data.select(range(config.data.num_samples))
+        print(f"[Dev] Note: using num_samples={config.data.num_samples} for debugging.")
 
     # -----------------------------
     # 2. Initialize 
@@ -48,11 +57,6 @@ def main_evaluate(config: DictConfig):
     evaluate_config = getattr(config, "evaluate", {})
     batch_size = evaluate_config.get("val_size", 1)
     eval_func = get_metrics(evaluate_config.get("metrics"))
-
-    for metric_name, func in eval_func.items():
-        print(f"Using evaluation metric: {metric_name}")
-        print(f"Sample evaluation result: {func(['This is a test.', 'hello'], ['This is a test.', 'we'], {'tgt_lang': 'en'})}")
-
 
 
     # -----------------------------
@@ -73,10 +77,33 @@ def main_evaluate(config: DictConfig):
 
     score = {}
     for metric_name, func in eval_func.items():
-        score[metric_name] = func(responses, answers, data[0].get("extra_info", {}))
+        sub_score = func(responses, answers, data[0].get("extra_info", {}))
+
+        # score may be for the whole or each example
+        if isinstance(sub_score, list):
+            data = data.add_column(f"{metric_name}_score", sub_score)
+
+        score[metric_name] = sub_score
         print(f"{metric_name}: {score[metric_name]:.4f}")
     print("Evaluation finished.")
 
+    if config.get("save_outputs", False):
+        import json
+        
+        file_name = f"{config.get('outputs_dir', './output')}/{dataset_name}_{config.llm.model.replace('/', '_')}_{dataset_name}.jsonl"
+    
+        if not os.path.exists(os.path.dirname(file_name)):
+            os.makedirs(os.path.dirname(file_name), exist_ok=True)
 
+        with open(file_name, "w") as f:
+            for item in tqdm(data, desc="Saving outputs"):
+                json_line = json.dumps(item, ensure_ascii=False, indent=4)
+                f.write(json_line + "\n")
+
+    del llm
+    gc.collect()
+
+    if torch.distributed.is_initialized():
+        cleanup_dist_env_and_memory(True)
 if __name__ == "__main__":
     main_evaluate()

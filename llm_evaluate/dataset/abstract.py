@@ -150,7 +150,7 @@ class EvalDataset(ABC):
         self,
         num_proc: int | None = None,
         batched: bool = False,
-        batch_size: int = 100,
+        batch_size: int | None = None,
         num_examines: int = 1,
     ) -> Dataset:
         """
@@ -173,6 +173,7 @@ class EvalDataset(ABC):
             remove_columns = self.datasets[0].column_names
             obj = self.datasets[0]
 
+        print("[Start] Map Process...")
         new_obj = obj.map(
             self._convert_item,
             with_indices=True,
@@ -181,6 +182,7 @@ class EvalDataset(ABC):
             num_proc=num_proc,
             batched=batched,
             batch_size=batch_size,
+            load_from_cache_file=False
         )
 
         print("[Done] Map Process.")

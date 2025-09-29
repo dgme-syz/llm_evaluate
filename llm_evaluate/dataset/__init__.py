@@ -1,7 +1,10 @@
-from llm_evaluate.dataset.abstract import EvalDataset
-from llm_evaluate.dataset.translation.flores import flores
+from .abstract import EvalDataset
+from .registry import get_dataset, register
+from .translation.flores import flores
 
 __all__ = [
     "EvalDataset",
+    "get_dataset",
+    "register",
     "flores",
 ]

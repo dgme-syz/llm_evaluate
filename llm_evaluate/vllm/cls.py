@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 import asyncio
 from typing import Any
 
+import httpx
 from vllm import LLM, SamplingParams
 from openai import AsyncOpenAI
-import httpx
-
+from transformers import AutoTokenizer
 
 class CausalLLM(ABC):
     llm: Any = None  # type: ignore
@@ -19,11 +19,17 @@ class syncCausalLLM(CausalLLM):
 
     def __init__(self, config) -> None:
         self.llm = LLM(**config["llm"])
+        self.tokenizer = AutoTokenizer.from_pretrained(config["llm"]["tokenizer"])
         self.config = config
 
     def generate(self, prompts) -> list[str]:
         sampling_params = SamplingParams(**self.config["sample_params"]["offline"])
-        resps = self.llm.chat(prompts, sampling_params=sampling_params)
+        prompts = [
+            self.tokenizer.apply_chat_template(
+                prompt, tokenize=False, add_generation_prompt=True
+            ) for prompt in prompts
+        ]
+        resps = self.llm.generate(prompts, sampling_params=sampling_params)
         return [r.outputs[0].text.strip() for r in resps]
 
 
