@@ -20,8 +20,9 @@ evaluate:
 use_server: false
 
 llm:
-  model: /home/nfs06/shenyz/models/Qwen2.5-7B-Instruct
-  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-7B-Instruct
+  model: /home/nfs06/shenyz/models/Hunyuan-MT-7B
+  model_impl: transformers
+  tokenizer: /home/nfs06/shenyz/models/Hunyuan-MT-7B
   dtype: float16
   gpu_memory_utilization: 0.4
   tensor_parallel_size: 2
