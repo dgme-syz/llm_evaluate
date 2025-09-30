@@ -4,12 +4,14 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-from llm_evaluate.dataset import get_dataset
-from llm_evaluate.vllm.utils import build_model
-from llm_evaluate.utils.metric import get_metrics
 import torch
 import gc
 from vllm.distributed.parallel_state import cleanup_dist_env_and_memory
+
+from llm_evaluate.dataset import get_dataset
+from llm_evaluate.vllm.utils import build_model
+from llm_evaluate.utils.metric import get_metrics
+from llm_evaluate.utils.eval_func import get_eval
 
 
 def generate_batched(examples, llm):
@@ -56,7 +58,7 @@ def main_evaluate(config: DictConfig):
     # -----------------------------
     evaluate_config = getattr(config, "evaluate", {})
     batch_size = evaluate_config.get("val_size", 1)
-    eval_func = get_metrics(evaluate_config.get("metrics"))
+    metric_func = get_metrics(evaluate_config.get("metrics"))
 
 
     # -----------------------------
@@ -64,9 +66,11 @@ def main_evaluate(config: DictConfig):
     # -----------------------------
     llm = build_model(config)
     print("Model initialized.")
-
+    eval_func_cls = get_eval(evaluate_config.get("eval_func"))
+    eval_func = eval_func_cls(llm)
+    
     data = data.map(
-        lambda examples: generate_batched(examples, llm),
+        lambda examples: eval_func(examples),
         batched=True,
         batch_size=batch_size,
         drop_last_batch=False,
@@ -76,14 +80,24 @@ def main_evaluate(config: DictConfig):
     responses = data["response"]
 
     score = {}
-    for metric_name, func in eval_func.items():
+    for metric_name, func in metric_func.items():
         sub_score = func(responses, answers, data[0].get("extra_info", {}))
+
+        if isinstance(sub_score, dict) and "score" in sub_score:
+            # for metrics that return dict with "score" and "extra_dict"
+            extra_dict = sub_score.get("extra_dict", {})
+            for k, v in extra_dict.items():
+                assert len(v) == len(data), f"Length of extra_dict {k} does not match data length."
+                data = data.add_column(f"{metric_name}_{k}", v)
+            sub_score = sub_score["score"]
 
         # score may be for the whole or each example
         if isinstance(sub_score, list):
             data = data.add_column(f"{metric_name}_score", sub_score)
-
-        score[metric_name] = sub_score
+        if isinstance(sub_score, list):
+            score[metric_name] = sum(sub_score) / len(sub_score)
+        else:
+            score[metric_name] = sub_score
         print(f"{metric_name}: {score[metric_name]:.4f}")
     print("Evaluation finished.")
 
