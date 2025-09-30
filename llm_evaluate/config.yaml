@@ -1,31 +1,27 @@
 data:
-  name: flores        
-  data_path: 
-    - /home/nfs06/shenyz/data/BenchMAX_General_Translation
-    - /home/nfs06/shenyz/data/BenchMAX_General_Translation
-  subset_name:
-    - flores_zh
-    - flores_en
-  split:
-    - train
-    - train
-  num_samples: null
+  name: gsm8k        
+  data_path: /home/nfs06/shenyz/data/gsm8k_hf
+  subset_name: main
+  split: test
+  num_samples: 10
 
 evaluate:
-  val_size: 64
+  val_size: 2048
   num_proc: null
   metrics:
-    - BLEU
+    - math_boxed_accuracy
+  eval_func: base
 
 use_server: false
 
 llm:
-  model: /home/nfs06/shenyz/models/Hunyuan-MT-7B
-  model_impl: transformers
-  tokenizer: /home/nfs06/shenyz/models/Hunyuan-MT-7B
-  dtype: float16
-  gpu_memory_utilization: 0.4
+  model: /home/nfs06/shenyz/models/Qwen2.5-0.5B
+  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-0.5B
+  trust_remote_code: true
+  dtype: bfloat16
+  gpu_memory_utilization: 0.9
   tensor_parallel_size: 2
+  seed: 42
 
 server: {}
 
