@@ -11,9 +11,11 @@ evaluate:
   metrics:
     - cometkiwi
     - BLEU
+    - xComet-xxl
   metrics_models_saved_dir: 
     - /home/nfs06/shenyz/models/wmt22-cometkiwi-da/checkpoints/model.ckpt # for comet, we use file (not a folder)
     - null
+    - /home/nfs06/shenyz/models/XCOMET-XXL/checkpoints/model.ckpt
   eval_func: base
 
 use_server: false
