@@ -74,14 +74,21 @@ def main_evaluate(config: DictConfig):
         batched=True,
         batch_size=batch_size,
         drop_last_batch=False,
+        load_from_cache_file=False
     )
 
     answers = [x["reward_model"]["ground_truth"] for x in data]
     responses = data["response"]
+    extra_infos = data["extra_info"]
 
     score = {}
-    for metric_name, func in metric_func.items():
-        sub_score = func(responses, answers, data[0].get("extra_info", {}))
+    saved_directories = evaluate_config.get("metrics_models_saved_dir", None)
+
+    for (metric_name, func), saved_dir in zip(metric_func.items(), saved_directories):
+        if saved_dir is not None:
+            func.saved_directory = saved_dir
+
+        sub_score = func(responses, answers, extra_infos)
 
         if isinstance(sub_score, dict) and "score" in sub_score:
             # for metrics that return dict with "score" and "extra_dict"
@@ -91,14 +98,14 @@ def main_evaluate(config: DictConfig):
                 data = data.add_column(f"{metric_name}_{k}", v)
             sub_score = sub_score["score"]
 
-        # score may be for the whole or each example
         if isinstance(sub_score, list):
             data = data.add_column(f"{metric_name}_score", sub_score)
-        if isinstance(sub_score, list):
             score[metric_name] = sum(sub_score) / len(sub_score)
         else:
             score[metric_name] = sub_score
+
         print(f"{metric_name}: {score[metric_name]:.4f}")
+
     print("Evaluation finished.")
 
     if config.get("save_outputs", False):

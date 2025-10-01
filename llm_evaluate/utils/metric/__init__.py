@@ -1,10 +1,10 @@
-from .translation import get_BLEU
 from .registry import get_metrics
-from .math import math_boxed_accuracy
+from .math import MathBoxedAccuracy
 
+# we have some code which should be executed
+from .translation import * 
 
 __all__ = [
-    "get_BLEU",
+    "MathBoxedAccuracy",
     "get_metrics",
-    "math_boxed_accuracy",
 ]

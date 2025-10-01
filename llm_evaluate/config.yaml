@@ -1,27 +1,32 @@
 data:
-  name: gsm8k        
-  data_path: /home/nfs06/shenyz/data/gsm8k_hf
-  subset_name: main
-  split: test
-  num_samples: 10
+  name: wmt24        
+  data_path: /home/nfs06/shenyz/data/wmt24
+  subset_name: en-zh_CN
+  split: train
+  num_samples: null
 
 evaluate:
   val_size: 2048
   num_proc: null
   metrics:
-    - math_boxed_accuracy
+    - cometkiwi
+    - BLEU
+  metrics_models_saved_dir: 
+    - /home/nfs06/shenyz/models/wmt22-cometkiwi-da/checkpoints/model.ckpt # for comet, we use file (not a folder)
+    - null
   eval_func: base
 
 use_server: false
 
 llm:
-  model: /home/nfs06/shenyz/models/Qwen2.5-0.5B
-  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-0.5B
+  model: /home/nfs06/shenyz/models/Qwen2.5-3B
+  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-3B
   trust_remote_code: true
-  dtype: bfloat16
+  dtype: float32
   gpu_memory_utilization: 0.9
-  tensor_parallel_size: 2
-  seed: 42
+  tensor_parallel_size: 4
+  # seed: 42
+  
 
 server: {}
 
