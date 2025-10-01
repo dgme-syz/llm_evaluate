@@ -1,62 +1,95 @@
-from llm_evaluate.dataset import EvalDataset
-from llm_evaluate.dataset.translation import LANG_DICT
-from llm_evaluate.dataset import register
+from llm_evaluate.dataset import EvalDataset, register
 
+import re
+
+# Number of characters to clip from the end for solution extraction
 _SOLUTION_CLIP_CHARS = 300
 
-def extract_solution(solution_str, method="strict"):
-    import re
-    assert method in ["strict", "flexible"]
 
-    # Optimization: Regular expression matching on very long strings can be slow.
-    # For math problems, the final answer is usually at the end.
-    # We only match on the last 300 characters, which is a safe approximation for 300 tokens.
+def extract_solution(solution_str: str, method: str = "strict") -> str | None:
+    """
+    Extract the numeric solution from a string, typically a math problem answer.
+
+    Args:
+        solution_str (str): The string containing the solution.
+        method (str, optional): Extraction mode. 'strict' checks for formatted solution,
+                                'flexible' extracts the last numeric value. Defaults to 'strict'.
+
+    Returns:
+        str | None: Extracted numeric solution, or None if not found.
+    """
+    assert method in ["strict", "flexible"], "method must be either 'strict' or 'flexible'"
+
+    # Clip the string to the last N characters for performance
     if len(solution_str) > _SOLUTION_CLIP_CHARS:
         solution_str = solution_str[-_SOLUTION_CLIP_CHARS:]
 
+    final_answer: str | None = None
+
     if method == "strict":
-        # this also tests the formatting of the model
-        solutions = re.findall("#### (\\-?[0-9\\.\\,]+)", solution_str)
-        if len(solutions) == 0:
-            final_answer = None
-        else:
-            # take the last solution
+        # Look for specifically formatted solution: "#### <number>"
+        solutions = re.findall(r"#### (\-?[0-9\.,]+)", solution_str)
+        if solutions:
+            # Take the last solution, remove commas and dollar signs
             final_answer = solutions[-1].replace(",", "").replace("$", "")
     elif method == "flexible":
-        answer = re.findall("(\\-?[0-9\\.\\,]+)", solution_str)
-        final_answer = None
-        if len(answer) == 0:
-            # no reward is there is no answer
-            pass
-        else:
-            invalid_str = ["", "."]
-            # find the last number that is not '.'
-            for final_answer in reversed(answer):
-                if final_answer not in invalid_str:
-                    break
-    return final_answer
+        # Extract all numeric patterns
+        answers = re.findall(r"(\-?[0-9\.,]+)", solution_str)
+        invalid_values = {"", "."}
 
+        # Take the last valid numeric value
+        for ans in reversed(answers):
+            if ans not in invalid_values:
+                final_answer = ans
+                break
+
+    return final_answer
 
 
 @register("gsm8k")
 class gsm8k(EvalDataset):
-    system_prompt = "You are a helpful assistant."
-    prompt = "{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}."
+    """
+    Dataset class for GSM8K math problem evaluation.
 
-    def __init__(self, data_dir, subset_name=None, split="train", builder=None):
+    Constructs a system + user prompt and extracts the ground-truth numeric answer.
+    """
+    system_prompt: str = "You are a helpful assistant."
+    prompt: str = "{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}."
+
+    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None):
+        """
+        Initialize the GSM8K dataset wrapper.
+
+        Args:
+            data_dir (str): Directory containing the dataset.
+            subset_name (optional): Not used for GSM8K.
+            split (str, optional): Dataset split ('train', 'test', etc.).
+            builder (callable, optional): Custom dataset builder.
+        """
         super().__init__(data_dir, subset_name, split, builder)
 
-    def convert_item(self, examples, **kwargs):
+    def convert_item(self, examples: dict, **kwargs) -> dict:
+        """
+        Convert a single dataset example into structured format for LLM evaluation.
 
+        Args:
+            examples (dict): A single example with keys 'question' and 'answer'.
+
+        Returns:
+            dict: Structured item with system/user prompt, ability, reward model, and extra info.
+        """
         message_list = []
-        if hasattr(self, "system_prompt") and self.system_prompt is not None:
-            message_list.append({"role": "system", "content": self.system_prompt})
-        if hasattr(self, "prompt") and self.prompt is not None:
-            message_list.append(
-                {"role": "user", "content": self.prompt.format(question=examples["question"])}
-            )
 
-        item = {
+        if getattr(self, "system_prompt", None):
+            message_list.append({"role": "system", "content": self.system_prompt})
+
+        if getattr(self, "prompt", None):
+            message_list.append({
+                "role": "user",
+                "content": self.prompt.format(question=examples["question"])
+            })
+
+        return {
             "data_source": "gsm8k",
             "prompt": message_list,
             "ability": "math",
@@ -66,7 +99,3 @@ class gsm8k(EvalDataset):
             },
             "extra_info": {}
         }
-        return item
-
-
-
