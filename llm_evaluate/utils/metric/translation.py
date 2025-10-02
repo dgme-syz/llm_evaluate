@@ -1,3 +1,8 @@
+import json
+import subprocess
+import tempfile
+from pathlib import Path
+
 import sacrebleu
 from llm_evaluate.utils.metric.registry import register
 from llm_evaluate.utils.metric.abstract import Metric
@@ -50,66 +55,41 @@ class spBLEU(Metric):
         )
         return result.score
 
-def build_Comet_cls(model_name: str):
 
+def build_Comet_cls(model_name: str):
     class DynamicComet(Metric):
         def __init__(self):
             self.model_name = model_name
-            self.comet_model = None
-            self.saved_directory = None
-
-        def _load_model(self):
-            """Lazy-load the COMET model when first needed."""
-            if self.comet_model is None:
-                from comet import load_from_checkpoint, download_model
-
-                model_path = None
-                if self.saved_directory == None:
-                    print("In this setting, you will download the model from hf")
-                else:
-                    model_path = self.saved_directory
-
-                if model_path == None:
-                    model_path = download_model(
-                        self.model_name, 
-                        saving_directory=self.saving_directory
-                    )
-                self.comet_model = load_from_checkpoint(model_path, local_files_only=False)
 
         def __call__(self, responses, references, extra_infos=None) -> dict:
             if extra_infos is None:
                 raise ValueError("extra_infos must be provided for Comet evaluation.")
 
             sources = [x["src"] for x in extra_infos]
-            assert len(responses) == len(references) == len(sources), (
-                "The number of translations, references, and sources must match."
-            )
+            assert len(responses) == len(references) == len(sources), "Mismatch lengths"
 
-            self._load_model()
+            data = [{"src": src, "mt": hyp, "ref": ref} 
+                    for src, hyp, ref in zip(sources, responses, references)]
 
-            # Prepare data for COMET
-            data = [
-                {"src": src, "mt": hyp, "ref": ref}
-                for src, hyp, ref in zip(sources, responses, references)
-            ]
+            with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".json") as f:
+                json.dump(data, f)
+                input_file = f.name
 
-            # Detect device for COMET
-            import torch
-            gpus = 1 if torch.cuda.is_available() else 0
+            output_file = Path(tempfile.gettempdir()) / f"comet_result_{Path(input_file).stem}.json"
 
-            # Run prediction
-            prediction = self.comet_model.predict(data, batch_size=16, gpus=gpus)
+            subprocess.run([
+                "python",
+                "./llm_evaluate/utils/metric/tools/comet_worker.py",
+                input_file,
+                self.model_name,
+                str(output_file)
+            ], check=True)
 
-            # Build output dict
-            outputs: dict = {"extra_dict": {}}
+            with open(output_file, "r") as f:
+                prediction = json.load(f)
+            print(prediction)
+            return prediction
 
-            if hasattr(prediction, "system_score"):
-                outputs["score"] = float(prediction.system_score)
-
-            if hasattr(prediction, "scores"):
-                outputs["extra_dict"]["score_per_example"] = list(prediction.scores)
-
-            return outputs
     return DynamicComet
 
 for cls_name, model_name in [

@@ -1,3 +1,0 @@
-[submodule "external/COMET"]
-	path = external/COMET
-	url = https://github.com/dgme-syz/COMET.git
