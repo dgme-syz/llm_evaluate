@@ -3,7 +3,7 @@ data:
   data_path: /home/nfs06/shenyz/data/wmt24
   subset_name: en-zh_CN
   split: train
-  num_samples: null
+  num_samples: 5
 
 evaluate:
   val_size: 2048
@@ -11,20 +11,15 @@ evaluate:
   metrics:
     - cometkiwi
     - BLEU
-    - xComet-xxl
-  metrics_models_saved_dir: 
-    - /home/nfs06/shenyz/models/wmt22-cometkiwi-da/checkpoints/model.ckpt # for comet, we use file (not a folder)
-    - null
-    - /home/nfs06/shenyz/models/XCOMET-XXL/checkpoints/model.ckpt
   eval_func: base
 
 use_server: false
 
 llm:
-  model: /home/nfs06/shenyz/models/Qwen2.5-3B
-  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-3B
+  model: /home/nfs06/shenyz/models/Qwen2.5-7B
+  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-7B
   trust_remote_code: true
-  dtype: float32
+  dtype: float16
   gpu_memory_utilization: 0.9
   tensor_parallel_size: 4
   # seed: 42
@@ -41,3 +36,7 @@ sample_params:
 
 save_outputs: true # save format: jsonl
 outputs_dir: ./outputs/
+
+hydra:
+  run:
+    dir: ./outputs/

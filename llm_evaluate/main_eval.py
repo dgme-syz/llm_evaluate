@@ -32,7 +32,7 @@ def generate_batched(examples, llm):
     return {"prompt": new_prompts, "response": batched_responses}
 
 
-@hydra.main(config_path=".", config_name="config")
+@hydra.main(config_path=".", config_name="config", version_base=None)
 def main_evaluate(config: DictConfig):
     print("Loaded config:\n", OmegaConf.to_yaml(config))
 
@@ -76,17 +76,18 @@ def main_evaluate(config: DictConfig):
         drop_last_batch=False,
         load_from_cache_file=False
     )
+    
+    if config.get("use_server", False) == False:
+        llm.llm.sleep(level=2)
+    
 
     answers = [x["reward_model"]["ground_truth"] for x in data]
     responses = data["response"]
     extra_infos = data["extra_info"]
 
     score = {}
-    saved_directories = evaluate_config.get("metrics_models_saved_dir", None)
 
-    for (metric_name, func), saved_dir in zip(metric_func.items(), saved_directories):
-        if saved_dir is not None:
-            func.saved_directory = saved_dir
+    for metric_name, func in metric_func.items():
 
         sub_score = func(responses, answers, extra_infos)
 
@@ -126,5 +127,6 @@ def main_evaluate(config: DictConfig):
 
     if torch.distributed.is_initialized():
         cleanup_dist_env_and_memory(True)
+    
 if __name__ == "__main__":
     main_evaluate()

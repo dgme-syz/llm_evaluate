@@ -18,7 +18,7 @@ class CausalLLM(ABC):
 class syncCausalLLM(CausalLLM):
 
     def __init__(self, config) -> None:
-        self.llm = LLM(**config["llm"])
+        self.llm = LLM(enable_sleep_mode=True, **config["llm"])
         self.tokenizer = AutoTokenizer.from_pretrained(config["llm"]["tokenizer"])
         self.config = config
 
