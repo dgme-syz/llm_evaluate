@@ -1,42 +1,55 @@
 data:
-  name: wmt24        
-  data_path: /home/nfs06/shenyz/data/wmt24
-  subset_name: en-zh_CN
+  name: math_train      
+  data_path: /home/nfs06/shenyz/data/SimpleRL/hard/train_processed.parquet
+  subset_name: null
   split: train
-  num_samples: 5
+  num_samples: 512
+  builder: parquet
 
 evaluate:
-  val_size: 2048
+  val_size: 512
   num_proc: null
   metrics:
-    - cometkiwi
-    - BLEU
-  eval_func: base
+    - union_math_accuracy
+  eval_func: no_steps
+  merge_strategy: pass
 
 use_server: false
 
+# /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+n_7+Qwen3-8B+256+gpus_8/global_step_160/actor/huggingface
+# /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
 llm:
-  model: /home/nfs06/shenyz/models/Qwen2.5-7B
-  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-7B
+  model: /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
+  tokenizer: /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
   trust_remote_code: true
-  dtype: float16
+  dtype: bfloat16
   gpu_memory_utilization: 0.9
-  tensor_parallel_size: 4
-  # seed: 42
+  tensor_parallel_size: 2
+  seed: 42
   
 
 server: {}
 
 sample_params:
   offline:
-    temperature: 0.0
-    max_tokens: 8192
+    temperature: 1.0 #0.0
+    max_tokens: 4096
+    # top_p: 0.95 # 1.0
+    # top_k: 20 # -1
+    # repetition_penalty: 1.1 # 1
+    n: 8
+
   online: {}
 
 
 save_outputs: true # save format: jsonl
-outputs_dir: ./outputs/
+outputs_dir: ./outputs/1/
+
+exp_name_prefix: "__without_steps__"
 
 hydra:
   run:
-    dir: ./outputs/
+    dir: ./outputs/1/
+
+# simple rl greedy decode 0.57
+# simple rl greedy 0.6 t 0.57

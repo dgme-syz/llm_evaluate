@@ -77,14 +77,25 @@ def build_Comet_cls(model_name: str):
 
             output_file = Path(tempfile.gettempdir()) / f"comet_result_{Path(input_file).stem}.json"
 
-            subprocess.run([
-                "python",
-                "./llm_evaluate/utils/metric/tools/comet_worker.py",
-                input_file,
-                self.model_name,
-                str(output_file)
-            ], check=True)
-
+            try:
+                result = subprocess.run(
+                    [
+                        "python",
+                        "./llm_evaluate/utils/metric/tools/comet_worker.py",
+                        input_file,
+                        self.model_name,
+                        str(output_file)
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            except subprocess.CalledProcessError as e:
+                print("COMET worker failed")
+                print("Return code:", e.returncode)
+                print("Stdout:", e.stdout)
+                print("Stderr:", e.stderr)
+        
             with open(output_file, "r") as f:
                 prediction = json.load(f)
             print(prediction)
@@ -93,7 +104,7 @@ def build_Comet_cls(model_name: str):
     return DynamicComet
 
 for cls_name, model_name in [
-    ("xComet-xxl", "Unbabel/XCOMET-XXL"), 
+    ("xcomet-xxl", "Unbabel/XCOMET-XXL"), 
     ("cometkiwi", "Unbabel/wmt22-cometkiwi-da"),
     ("comet-22", "Unbabel/wmt22-comet-da")
 ]:

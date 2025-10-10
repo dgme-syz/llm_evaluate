@@ -22,15 +22,29 @@ class syncCausalLLM(CausalLLM):
         self.tokenizer = AutoTokenizer.from_pretrained(config["llm"]["tokenizer"])
         self.config = config
 
-    def generate(self, prompts) -> list[str]:
+    def generate(self, prompts) -> list[list[str]]:
         sampling_params = SamplingParams(**self.config["sample_params"]["offline"])
-        prompts = [
-            self.tokenizer.apply_chat_template(
-                prompt, tokenize=False, add_generation_prompt=True
-            ) for prompt in prompts
-        ]
+
+        vllm_inputs = []
+        for prompt in prompts:
+            if isinstance(prompt, list):
+                prompt = self.tokenizer.apply_chat_template(
+                    prompt, tokenize=False, add_generation_prompt=True
+                )
+            elif not isinstance(prompt, str):
+                raise ValueError("Prompt must be a string or a list of dict.")
+            vllm_inputs.append(prompt)
+
         resps = self.llm.generate(prompts, sampling_params=sampling_params)
-        return [r.outputs[0].text.strip() for r in resps]
+
+        ret = []
+        for r in resps:
+            _ret = []
+            for i in range(len(r.outputs)):
+                _ret += [r.outputs[i].text.strip()]
+            ret += [_ret]
+        
+        return ret
 
 
 class asyncCausalLLM(CausalLLM):
@@ -50,6 +64,7 @@ class asyncCausalLLM(CausalLLM):
         self.config = config
 
     async def _generate(self, prompts) -> list[str]:
+        # [TODO] update to list[list[str]]
         model = self.config["llm"].get("model", None)
 
         models_list = await self.llm.models.list()
