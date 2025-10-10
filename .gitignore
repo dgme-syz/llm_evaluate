@@ -29,3 +29,7 @@ TestResults.xml
 *.hydra*
 *.log
 *.txt
+*.json
+*.jsonl
+*.pdf
+*.svg

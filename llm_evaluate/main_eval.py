@@ -12,25 +12,7 @@ from llm_evaluate.dataset import get_dataset
 from llm_evaluate.vllm.utils import build_model
 from llm_evaluate.utils.metric import get_metrics
 from llm_evaluate.utils.eval_func import get_eval
-
-
-def generate_batched(examples, llm):
-    """
-    Batch inference function:
-    - Input: examples containing "prompt"
-    - Output: updated prompts with assistant responses appended
-    """
-    batched_prompts = examples["prompt"]
-    batched_responses = llm.generate(batched_prompts)
-
-    new_prompts = [
-        prompt + [{"role": "assistant", "content": resp}]
-        for prompt, resp in zip(batched_prompts, batched_responses)
-    ]
-
-
-    return {"prompt": new_prompts, "response": batched_responses}
-
+from llm_evaluate.utils.merge_wrapper import decorator
 
 @hydra.main(config_path=".", config_name="config", version_base=None)
 def main_evaluate(config: DictConfig):
@@ -82,13 +64,20 @@ def main_evaluate(config: DictConfig):
     
 
     answers = [x["reward_model"]["ground_truth"] for x in data]
-    responses = data["response"]
+    responses: list[list[str]] = data["response"]
     extra_infos = data["extra_info"]
 
     score = {}
 
-    for metric_name, func in metric_func.items():
+    merge_strategy = evaluate_config.get("merge_strategy", "pass")
+    
+    if config.use_server:
+        num_generations = config.sample_params.online.get("n")
+    else:
+        num_generations = config.sample_params.offline.get("n")
 
+    for metric_name, func in metric_func.items():
+        func = decorator(func, merge_strategy=merge_strategy)
         sub_score = func(responses, answers, extra_infos)
 
         if isinstance(sub_score, dict) and "score" in sub_score:
@@ -100,7 +89,7 @@ def main_evaluate(config: DictConfig):
             sub_score = sub_score["score"]
 
         if isinstance(sub_score, list):
-            data = data.add_column(f"{metric_name}_score", sub_score)
+            data = data.add_column(f"{metric_name}_score_{merge_strategy}@{num_generations}", sub_score)
             score[metric_name] = sum(sub_score) / len(sub_score)
         else:
             score[metric_name] = sub_score
@@ -111,9 +100,9 @@ def main_evaluate(config: DictConfig):
 
     if config.get("save_outputs", False):
         import json
-        
-        file_name = f"{config.get('outputs_dir', './output')}/{dataset_name}_{config.llm.model.replace('/', '_')}_{dataset_name}.jsonl"
-    
+
+        file_name = f"{config.get('outputs_dir', './output')}/{config.exp_name_prefix}_{dataset_name}_{config.llm.model.replace('/', '_')}_{dataset_name}_{evaluate_config.get('eval_func')}.jsonl"
+
         if not os.path.exists(os.path.dirname(file_name)):
             os.makedirs(os.path.dirname(file_name), exist_ok=True)
 

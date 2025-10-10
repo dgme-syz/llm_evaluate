@@ -48,6 +48,14 @@ def extract_solution(solution_str: str, method: str = "strict") -> str | None:
 
 @register("gsm8k")
 class gsm8k(EvalDataset):
+
+    # name: gsm8k        
+    # data_path: /home/nfs06/shenyz/data/gsm8k_hf
+    # subset_name: main
+    # split: test
+    # num_samples: null
+
+
     """
     Dataset class for GSM8K math problem evaluation.
 
@@ -55,6 +63,7 @@ class gsm8k(EvalDataset):
     """
     system_prompt: str = "You are a helpful assistant."
     prompt: str = "{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}."
+    simple_prompt: str = "Question:{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}.\n\nAnswer:\n"
 
     def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None):
         """
@@ -78,20 +87,21 @@ class gsm8k(EvalDataset):
         Returns:
             dict: Structured item with system/user prompt, ability, reward model, and extra info.
         """
-        message_list = []
+        # message_list = []
 
-        if getattr(self, "system_prompt", None):
-            message_list.append({"role": "system", "content": self.system_prompt})
+        # if getattr(self, "system_prompt", None):
+        #     message_list.append({"role": "system", "content": self.system_prompt})
 
-        if getattr(self, "prompt", None):
-            message_list.append({
-                "role": "user",
-                "content": self.prompt.format(question=examples["question"])
-            })
+        # if getattr(self, "prompt", None):
+        #     message_list.append({
+        #         "role": "user",
+        #         "content": self.prompt.format(question=examples["question"])
+        #     })
 
+        prompt = self.simple_prompt.format(question=examples["question"])
         return {
             "data_source": "gsm8k",
-            "prompt": message_list,
+            "prompt": prompt,
             "ability": "math",
             "reward_model": {
                 "ground_truth": extract_solution(examples["answer"]),

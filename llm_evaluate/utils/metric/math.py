@@ -55,7 +55,9 @@ class MathBoxedAccuracy(Metric):
         extracted_answers: list[str | None] = []
 
         for content, sol in zip(responses, references):
-            gold_parsed = parse(sol, extraction_mode="first_match")
+            gold_parsed = parse(sol)
+            if len(gold_parsed) == 0:
+                gold_parsed = parse(f"\\boxed{{{sol}}}")
 
             if len(gold_parsed) != 0:
                 # Parse student response
@@ -74,9 +76,8 @@ class MathBoxedAccuracy(Metric):
                             boxed_match_priority=0,
                             try_extract_without_anchor=True,
                         ),
-                        ExprExtractionConfig(),
+                        ExprExtractionConfig(try_extract_without_anchor=False),
                     ],
-                    extraction_mode="first_match",
                 )
 
                 if len(answer_parsed) == 0:
@@ -102,3 +103,89 @@ class MathBoxedAccuracy(Metric):
                 "extracted_answer": extracted_answers,
             },
         }
+
+
+
+import re
+from verl.utils.reward_score.math_reward import compute_score as math_compute_score
+
+def foramt_reward(solution_str):
+    match = re.search(r"\\boxed\{([^}]*)\}", solution_str)
+    if match:
+        return True
+    return False
+
+
+def extract_final_answer(solution_str):
+    matches = re.findall(r"The answer is:?\s*([^\n.]*)", solution_str)
+    if matches:
+        return matches[-1].strip()
+    
+    numbers = re.findall(r"(-?\d+(?:\.\d+)?)", solution_str) # fix "9. " will be extracted
+    if numbers:
+        return numbers[-1]
+    
+    return None
+
+def check(solution_str, ground_truth):
+    if math_compute_score(solution_str, ground_truth) > 0:
+        return True
+    else:
+        if foramt_reward(solution_str) == False:
+            soft_ans = f"\\boxed{{{extract_final_answer(solution_str)}}}"
+            if math_compute_score(soft_ans, ground_truth) > 0:
+                return True
+    return False
+    
+def eval_score(
+    solution_str, 
+    ground_truth, 
+    extra_info=None,
+    data_source=None,
+    format_reward=0.0,
+    score=1.0
+):
+    if not foramt_reward(solution_str):
+        format_reward = 0.0
+
+    if check(solution_str, ground_truth):
+        return score + format_reward
+
+    return format_reward
+
+
+@register("soft_math_accuracy")
+class SoftMathAccuracy(Metric):
+
+    def __call__(
+        self,
+        responses: list[str],
+        references: list[str],
+        extra_infos: list[dict] | None = None,
+    ) -> dict:
+        
+        score = []
+        for resp, ref in zip(responses, references):
+            score.append(eval_score(resp, ref))
+
+        return {"score": score}
+
+
+@register("union_math_accuracy")
+class UnionMathAccuracy(Metric):
+
+    def __init__(self):
+        self.math_boxed = MathBoxedAccuracy()
+        self.soft_math = SoftMathAccuracy()
+
+    def __call__(
+        self,
+        responses: list[str],
+        references: list[str],
+        extra_infos: list[dict] | None = None,
+    ) -> dict:
+        
+        score1 = self.math_boxed(responses, references)["score"]
+        score2 = self.soft_math(responses, references)["score"]
+
+        return {"score": [max(x, y) for x, y in zip(score1, score2)]}
