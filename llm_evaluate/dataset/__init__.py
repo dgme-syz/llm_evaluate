@@ -7,6 +7,7 @@ from .math.math500 import math500
 from .math.math500 import mathtrain
 from .math.aime2024 import aime2024
 from .math.aime2025 import aime2025
+from .math.llm_judge import llm_judge
 
 __all__ = [
     "EvalDataset",
@@ -18,4 +19,5 @@ __all__ = [
     "aime2024",
     "aime2025",
     "mathtrain",
+    "llm_judge",
 ]

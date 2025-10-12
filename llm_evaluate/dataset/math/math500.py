@@ -1,19 +1,16 @@
-from llm_evaluate.dataset import EvalDataset, register
-
 import re
 
-# Number of characters to clip from the end for solution extraction
-_SOLUTION_CLIP_CHARS = 300
-
+from llm_evaluate.dataset import EvalDataset, register
 
 @register("math_train")
 class mathtrain(EvalDataset):
 
-    # name: math500        
-    # data_path: /home/nfs06/shenyz/data/math500
-    # subset_name: null
-    # split: test
-    # num_samples: null
+#   name: math_train      
+#   data_path: /home/nfs06/shenyz/data/SimpleRL/hard/train_processed.parquet
+#   subset_name: null
+#   split: train
+#   num_samples: 512
+#   builder: parquet
 
     """
     Dataset class for GSM8K math problem evaluation.
