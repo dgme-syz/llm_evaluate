@@ -152,6 +152,7 @@ class EvalDataset(ABC):
         batched: bool = False,
         batch_size: int | None = None,
         num_examines: int = 1,
+        save_columns: bool = False,
     ) -> Dataset:
         """
         Apply `convert_item` (single mode) or `convert_items` (batched mode)
@@ -166,12 +167,16 @@ class EvalDataset(ABC):
         Returns:
             A new Dataset with transformed items.
         """
+        
         if isinstance(self.datasets, Dataset):
             remove_columns = self.datasets.column_names
             obj = self.datasets
         else:
             remove_columns = self.datasets[0].column_names
             obj = self.datasets[0]
+
+        if save_columns:
+            remove_columns = None
 
         print("[Start] Map Process...")
         new_obj = obj.map(

@@ -23,7 +23,7 @@ def decorator(obj: Metric, merge_strategy: Literal["avg", "pass"] = "pass"):
         if merge_strategy == "pass":
             results = [max(x) for x in scores]
         elif merge_strategy == "avg":
-            results = [sum(x) / len(x) for x in scores]
+            results = [sum(x) / len(x) if len(x) else None for x in scores]
         else:
             raise NotImplementedError(
                 f"Please select merge_strategy from ['avg', 'pass']."
@@ -34,7 +34,7 @@ def decorator(obj: Metric, merge_strategy: Literal["avg", "pass"] = "pass"):
 
         ret.update({
             "extra_dict": {
-                "pass@1_score": [x[0] for x in scores],
+                "pass@1_score": [x[0] if len(x) else None for x in scores],
                 "detail_results": detailed_results,
             }
         })

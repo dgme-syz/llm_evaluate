@@ -21,11 +21,11 @@ evaluate:
 use_server: false
 
 llm:
-  model: /home/nfs06/shenyz/models/Qwen2.5-0.5B-Instruct
-  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-0.5B-Instruct
+  model: /home/nfs06/shenyz/models/Qwen2.5-7B-Instruct
+  tokenizer: /home/nfs06/shenyz/models/Qwen2.5-7B-Instruct
   trust_remote_code: true
-  dtype: float16
-  gpu_memory_utilization: 0.4
+  dtype: bfloat16
+  gpu_memory_utilization: 0.9
   tensor_parallel_size: 2
 
 server: {}
