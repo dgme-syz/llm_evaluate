@@ -26,11 +26,12 @@ def main_evaluate(config: DictConfig):
     subset_name = getattr(config.data, "subset_name", None)
     split = getattr(config.data, "split", "test")
     builder = getattr(config.data, "builder", None)
+    save_columns = getattr(config.data, "save_columns", False)
 
     dataset_cls = get_dataset(dataset_name)
     dataset_obj = dataset_cls(data_path, subset_name=subset_name, split=split, builder=builder)
-    data = dataset_obj.map(batched=False)
-    
+    data = dataset_obj.map(batched=False, save_columns=save_columns)
+
     if config.data.get("num_samples", None) is not None:
         data = data.select(range(config.data.num_samples))
         print(f"[Dev] Note: using num_samples={config.data.num_samples} for debugging.")
@@ -85,16 +86,17 @@ def main_evaluate(config: DictConfig):
             extra_dict = sub_score.get("extra_dict", {})
             for k, v in extra_dict.items():
                 assert len(v) == len(data), f"Length of extra_dict {k} does not match data length."
-                data = data.add_column(f"{metric_name}_{k}", v)
+                data = data.add_column(f"{config.data.name}_{metric_name}_{k}", v)
             sub_score = sub_score["score"]
 
-        if isinstance(sub_score, list):
-            data = data.add_column(f"{metric_name}_score_{merge_strategy}@{num_generations}", sub_score)
+        if isinstance(sub_score, list) and all(isinstance(x, (int, float)) for x in sub_score):
+            data = data.add_column(f"{config.data.name}_{metric_name}_score_{merge_strategy}@{num_generations}", sub_score)
             score[metric_name] = sum(sub_score) / len(sub_score)
         else:
             score[metric_name] = sub_score
-
-        print(f"{metric_name}: {score[metric_name]:.4f}")
+        
+        if isinstance(score[metric_name], float):
+            print(f"{metric_name}: {score[metric_name]:.4f}")
 
     print("Evaluation finished.")
 

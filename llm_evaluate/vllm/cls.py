@@ -16,12 +16,18 @@ class CausalLLM(ABC):
 
 
 def flatten_with_paths(data, path=()):
-    if isinstance(data, list) and isinstance(data[0], (str, dict)):
+    if isinstance(data, list):
+        if not data:
+            return [(path, [])]
+        if all(isinstance(x, (str, dict)) for x in data):
+            return [(path, data)]
+        res = []
+        for i, x in enumerate(data):
+            res.extend(flatten_with_paths(x, path + (i,)))
+        return res
+    else:
         return [(path, data)]
-    res = []
-    for i, x in enumerate(data):
-        res.extend(flatten_with_paths(x, path + (i,)))
-    return res
+
 
 def reconstruct_from_paths(paths, values):
     res = {}
@@ -30,13 +36,17 @@ def reconstruct_from_paths(paths, values):
         for p in path[:-1]:
             d = d.setdefault(p, {})
         d[path[-1]] = value
-    
+
     def dict_to_list(d):
         if not isinstance(d, dict):
             return d
+        if not d:
+            return [] 
         max_idx = max(d.keys())
-        return [dict_to_list(d[i]) for i in range(max_idx + 1)]
+        return [dict_to_list(d.get(i, [])) for i in range(max_idx + 1)]
+
     return dict_to_list(res)
+
 
 
 
@@ -51,7 +61,7 @@ class syncCausalLLM(CausalLLM):
     def generate(self, prompts) -> list[list[str]]:
         sampling_params = SamplingParams(**self.config["sample_params"]["offline"])
 
-        paths, flat = flatten_with_paths(prompts)
+        paths, flat = zip(*flatten_with_paths(prompts))
         vllm_inputs = []
         for prompt in flat:
             if isinstance(prompt, list):
@@ -77,53 +87,71 @@ class syncCausalLLM(CausalLLM):
 class asyncCausalLLM(CausalLLM):
 
     def __init__(self, config) -> None:
-        ignore_proxy = config["server"].pop("ignore_proxy", False)
+        server_cfg = dict(config["server"])
+        ignore_proxy = server_cfg.pop("ignore_proxy", False)
 
+        print("connect to server with config:", server_cfg)
         if ignore_proxy:
             self.llm = AsyncOpenAI(
-                **config["server"],
+                **server_cfg,
                 http_client=httpx.AsyncClient(
                     transport=httpx.AsyncHTTPTransport(proxy=None)
                 )
             )
         else:
-            self.llm = AsyncOpenAI(**config["server"])
+            self.llm = AsyncOpenAI(**server_cfg)
         self.config = config
-        self.sampling_params = config["online"]
+        self.sampling_params = config["sample_params"]["online"]
+        self.model = self.config["llm"].get("model", None)
+
+        if self.model is None:
+
+            models_list = self.llm.models.list()
+            if not any(self.model == x.id for x in models_list.data):
+                self.model = models_list.data[0].id
+                print(f"Warning: model {self.config['llm'].get('model', None)} not found, "
+                    f"using {self.model} instead.")
 
     async def _generate(self, prompts) -> list[str]:
         # [TODO] update to list[list[str]]
-        model = self.config["llm"].get("model", None)
-
-        models_list = await self.llm.models.list()
-        if not any(model == x.id for x in models_list.data):
-            model = models_list.data[0].id
-            print(f"Warning: model {self.config['llm'].get('model', None)} not found, "
-                  f"using {model} instead.")
 
         tasks = []
-        params = self.sampling_params.copy()
+        params = dict(self.sampling_params).copy()
         n = params.pop("n", 1)
 
-        paths, flat = flatten_with_paths(prompts)
-        for prompt in flat:
-            if not isinstance(prompt, str) and not isinstance(prompt, list):
+        # print(prompts)
+        paths, flat = zip(*flatten_with_paths(prompts))
+        empty_prompts_idx = [] 
+
+        for i, prompt in enumerate(flat):
+            if not isinstance(prompt, (str, list)):
                 raise ValueError("Prompt must be a string or a list of dict.")
-            
+
+            if isinstance(prompt, list) and len(prompt) == 0:
+                empty_prompts_idx.append(i)
+                continue
+
             for _ in range(n):
                 tasks.append(
-                    self.llm.completions.create(
-                        model=model,
-                        prompt=prompt,
+                    self.llm.chat.completions.create(
+                        model=self.model,
+                        messages=prompt,
                         **self.config["sample_params"]["online"]
                     )
                 )
+
         results = await asyncio.gather(*tasks)
+
+        for idx in empty_prompts_idx:
+            for _ in range(n):
+                results.insert(idx * n, [])
+
         ret = []
         for i in range(0, len(results), n):
-            ret += [r.choices[0].text.strip() for r in results[i:i+n]]
-
-        return reconstruct_from_paths(paths, ret)
+            ret += [r.choices[0].message.content.strip() if hasattr(r, "choices") else r for r in results[i:i+n]]
+        ret = reconstruct_from_paths(paths, ret)
+        print(ret)
+        return ret
 
     def generate(self, prompts) -> list[str]:
         return asyncio.run(self._generate(prompts))

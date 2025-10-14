@@ -36,7 +36,7 @@ class BLEU(Metric):
             tokenize=tokenizer,
             force=True,
         )
-        return result.score
+        return {"score": result.score}
 
 
 @register("spBLEU")
@@ -53,7 +53,7 @@ class spBLEU(Metric):
             tokenize="flores200",
             force=True,
         )
-        return result.score
+        return {"score": result.score}
 
 
 def build_Comet_cls(model_name: str):

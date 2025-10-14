@@ -1,0 +1,62 @@
+data:
+  name: llm_judge      
+  data_path: outputs/1/rollout/update__without_steps___math_train__home_nfs05_shenyz_verl_checkpoints_verl_grpo_Qwen2.5-1.5B+GRPO+256+gpus_4_global_step_300_actor_huggingface_math_train_base.jsonl
+  subset_name: null
+  split: train
+  num_samples: null
+  builder: json
+  save_columns: true # For llm_judge, we need to keep all original columns.
+
+evaluate:
+  val_size: 512
+  num_proc: null
+  metrics:
+    - union_math_accuracy
+  eval_func: base
+  merge_strategy: avg
+
+use_server: true
+
+# /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+n_7+Qwen3-8B+256+gpus_8/global_step_160/actor/huggingface
+# /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
+# /home/nfs06/shenyz/models/Qwen2.5-1.5B
+llm:
+  model: deepseek-chat
+  tokenizer: null
+  trust_remote_code: true
+  dtype: bfloat16
+  gpu_memory_utilization: 0.7
+  tensor_parallel_size: 2
+  seed: 42
+  
+
+server: 
+  ignore_proxy: false
+  api_key: sk-85248f19f6ec4e94902a3c90d15f2ffe 
+  base_url: https://api.deepseek.com/v1
+
+sample_params:
+  offline:
+    temperature: 1.0 #0.0
+    max_tokens: 4096
+    # top_p: 0.95 # 1.0
+    # top_k: 20 # -1
+    # repetition_penalty: 1.1 # 1
+    n: 8
+
+  online: 
+    temperature: 1.0 #0.0
+    max_tokens: 4096
+
+
+save_outputs: true # save format: jsonl
+outputs_dir: ./outputs/1/rollout
+
+exp_name_prefix: "__without_steps__"
+
+hydra:
+  run:
+    dir: ./outputs/1/rollout
+
+# simple rl greedy decode 0.57
+# simple rl greedy 0.6 t 0.57

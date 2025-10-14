@@ -31,9 +31,8 @@ class llm_judge(EvalDataset):
             dict: Structured item with system/user prompt, ability, reward model, and extra info.
         """
         ret = examples
-        ret.pop("extra_info")
         raw_prompt = ret.pop("prompt")
-        pattern = r'Question:(.*?)\\nPlease reason step by step, and put your final answer within \\\\boxed\{\}\.\\n\\nAnswer:\\n'
+        pattern = r'Question:(.*?)\nPlease reason step by step, and put your final answer within'
         match = re.search(pattern, raw_prompt, re.DOTALL)
         if match:
             question = match.group(1).strip()
@@ -49,9 +48,10 @@ class llm_judge(EvalDataset):
             question = match.group(1).strip()
 
         num_responses = len(examples["response"])
+        assert num_responses > 0
         for i in range(num_responses):
             if examples["union_math_accuracy_detail_results"][i] > 0.0:
-                ret["prompt"] += [
+                ret["prompt"].append([
                     {"role": "system", "content": self.system_prompt},
                     {
                         "role": "user",
@@ -60,5 +60,5 @@ class llm_judge(EvalDataset):
                             solution=ret["response"][i],
                         ),
                     },
-                ]
+                ])
         return ret
