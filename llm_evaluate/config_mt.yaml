@@ -12,7 +12,7 @@ data:
   num_samples: null
 
 evaluate:
-  val_size: 64
+  val_size: 10000
   num_proc: null
   metrics:
     - BLEU
