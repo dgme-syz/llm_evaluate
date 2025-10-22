@@ -14,6 +14,7 @@ class EvalDataset(ABC):
         subset_name: str | list[str] | DictConfig | ListConfig | None = None,
         split: str | list[str] | DictConfig | ListConfig = "test",
         builder: str | list[str] | DictConfig | ListConfig | None = None,
+        **kwargs
     ) -> None:
         """
         Args:

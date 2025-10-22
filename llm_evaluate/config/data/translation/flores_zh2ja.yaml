@@ -1,0 +1,11 @@
+name: flores
+data_path:
+  - /home/nfs06/shenyz/data/BenchMAX_General_Translation
+  - /home/nfs06/shenyz/data/BenchMAX_General_Translation
+subset_name:
+  - flores_zh
+  - flores_ja
+split:
+  - train
+  - train
+num_samples: null

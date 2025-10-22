@@ -5,10 +5,10 @@ from llm_evaluate.dataset import EvalDataset, register
 @register("llm_judge")
 class llm_judge(EvalDataset):
 
-    system_prompt: str = "You are a helpful assistant.You are given a problem and a solution; the solution's final answer is correct, but the steps may not be. Check whether the solution's steps both exist and are correct. If they exist and are correct, output \\boxed{1} at the end; otherwise output \\boxed{0}."
+    system_prompt: str = "You are a helpful assistant.You are given a problem and a solution; the solution's final answer is correct, but the steps may not be. Ignore any code parts in the solution—only consider whether the calculation steps exist and are correct (disregarding the code). Strictly Check whether the solution's steps both exist and are correct. If they exist and are correct, output \\boxed{1} at the end; otherwise output \\boxed{0}."
     user_prompt: str = "Problem: {question}\nSolution: {solution}\n"
 
-    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None):
+    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None, **kwargs):
         """
         Initialize the GSM8K dataset wrapper.
 
@@ -50,7 +50,7 @@ class llm_judge(EvalDataset):
         num_responses = len(examples["response"])
         assert num_responses > 0
         for i in range(num_responses):
-            if examples["union_math_accuracy_detail_results"][i] > 0.0:
+            if examples.get("union_math_accuracy_detail_results", examples.get("math_train_union_math_accuracy_detail_results"))[i] > 0.0:
                 ret["prompt"].append([
                     {"role": "system", "content": self.system_prompt},
                     {

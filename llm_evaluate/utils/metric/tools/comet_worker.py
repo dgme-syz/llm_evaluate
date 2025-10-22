@@ -1,6 +1,7 @@
 # comet_worker.py
 import sys
 import json
+
 import torch
 from comet import download_model, load_from_checkpoint
 from comet.models.utils import Prediction
@@ -12,12 +13,12 @@ output_file = sys.argv[3]
 
 with open(data_path, "r") as f:
     data = json.load(f)
-
-model_path = download_model(model_name)
-comet_model = load_from_checkpoint(model_path, local_files_only=False)
-
-gpus = 4
+torch.serialization.add_safe_globals([Prediction])
+gpus = torch.cuda.device_count()
 with safe_globals([Prediction]):
+    
+    model_path = download_model(model_name)
+    comet_model = load_from_checkpoint(model_path, local_files_only=False)
     prediction = comet_model.predict(data, batch_size=64, gpus=gpus)    
 
 outputs: dict = {"extra_dict": {}}

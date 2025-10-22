@@ -18,7 +18,9 @@ classifiers = [
 # 指定依赖
 dependencies = [
     "datasets",
-    "pyarrow==20.0.0"
+    "pyarrow==19.0.0",
+    "sacrebleu",
+    "unbabel-comet",
 ]
 
 [project.optional-dependencies]

@@ -1,48 +1,50 @@
 data:
   name: llm_judge      
-  data_path: outputs/1/rollout/update__without_steps___math_train__home_nfs05_shenyz_verl_checkpoints_verl_grpo_Qwen2.5-1.5B+GRPO+256+gpus_4_global_step_300_actor_huggingface_math_train_base.jsonl
+  # data_path: outputs/1/rollout/update_(Base_Greedy)_math_train__home_nfs06_shenyz_models_Qwen2.5-1.5B_math_train_base.jsonl
+  data_path: outputs/1/rollout/update_(SimpleRL_Greedy_7B)_math_train__home_nfs05_shenyz_models_Qwen-2.5-7B-SimpleRL-Zoo__math_train_base.jsonl
   subset_name: null
   split: train
   num_samples: null
   builder: json
   save_columns: true # For llm_judge, we need to keep all original columns.
+exp_name_prefix: "(SimpleRL_7B_Greedy_locate)"
 
 evaluate:
-  val_size: 512
+  val_size: 4300
   num_proc: null
   metrics:
     - union_math_accuracy
   eval_func: base
   merge_strategy: avg
 
-use_server: true
+use_server: false
 
 # /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+n_7+Qwen3-8B+256+gpus_8/global_step_160/actor/huggingface
 # /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
 # /home/nfs06/shenyz/models/Qwen2.5-1.5B
 llm:
-  model: deepseek-chat
-  tokenizer: null
+  model: /home/nfs06/shenyz/models/Qwen3-8B
+  tokenizer: /home/nfs06/shenyz/models/Qwen3-8B
   trust_remote_code: true
   dtype: bfloat16
-  gpu_memory_utilization: 0.7
+  gpu_memory_utilization: 0.8
   tensor_parallel_size: 2
   seed: 42
-  
+  enable_chunked_prefill: true # for V100, set false
 
-server: 
-  ignore_proxy: false
-  api_key: sk-85248f19f6ec4e94902a3c90d15f2ffe 
-  base_url: https://api.deepseek.com/v1
+tokenize_args:
+  enable_thinking: true
 
 sample_params:
   offline:
-    temperature: 1.0 #0.0
+    temperature: 0.6
+    top_k: 20
+    top_p: 0.95
     max_tokens: 4096
     # top_p: 0.95 # 1.0
     # top_k: 20 # -1
     # repetition_penalty: 1.1 # 1
-    n: 8
+    n: 1
 
   online: 
     temperature: 1.0 #0.0
@@ -52,7 +54,6 @@ sample_params:
 save_outputs: true # save format: jsonl
 outputs_dir: ./outputs/1/rollout
 
-exp_name_prefix: "__without_steps__"
 
 hydra:
   run:

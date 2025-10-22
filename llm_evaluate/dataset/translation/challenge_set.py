@@ -8,15 +8,14 @@ from llm_evaluate.dataset.translation import (
 )
 
 
-@register("wmt24")
-class wmt24(EvalDataset):
-    """
-    Dataset class for WMT24 translation evaluation.
+@register("challenge_set")
+class challenge_set(EvalDataset):
+# name: challenge_set        
+# data_path: /home/nfs06/shenyz/data/seed_x_challenge_set
+# subset_name: en-zh_CN
+# split: train
 
-    It constructs a prompt for translation tasks and returns structured items
-    compatible with LLM evaluation pipelines.
-    """
-
+    # https://github.com/ByteDance-Seed/Seed-X-7B/blob/main/challenge_set/Challenge_set_en2zh.json
     def __init__(self, data_dir, subset_name=None, split="train", builder=None, extra_args=None):
         """
         Initialize the WMT24 dataset wrapper.
@@ -48,8 +47,8 @@ class wmt24(EvalDataset):
         Returns:
             dict: Structured item with prompt, ability, reward model, and extra info.
         """
-        src_text = examples["source"]
-        tgt_text = examples["target"]
+        src_text = examples["src_text"]
+        tgt_text = examples["参考译文"]
 
         m = self.extra_args.get("model").lower()
         if "qwen" in m:
@@ -65,7 +64,7 @@ class wmt24(EvalDataset):
             raise ValueError(f"Unsupported model {m} for challenge_set dataset.")
         
         return {
-            "data_source": "wmt24",
+            "data_source": "challenge_set",
             "prompt": prompt,
             "ability": "translation",
             "reward_model": {

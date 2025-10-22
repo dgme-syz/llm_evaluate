@@ -2,6 +2,7 @@ from .abstract import EvalDataset
 from .registry import get_dataset, register
 from .translation.flores import flores
 from .translation.wmt24 import wmt24
+from .translation.challenge_set import challenge_set
 from .math.gsm8k import gsm8k
 from .math.math500 import math500
 from .math.math500 import mathtrain

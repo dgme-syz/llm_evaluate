@@ -17,8 +17,8 @@ def build_model(config: dict[str, Any]):
         ValueError: If `use_server` contains an invalid value.
     """
     if config.get("use_server", True):
-        from llm_evaluate.vllm.cls import asyncCausalLLM as CausalLLM
+        from llm_evaluate.vllm.cls import AsyncCausalLLM as CausalLLM
     else:
-        from llm_evaluate.vllm.cls import syncCausalLLM as CausalLLM
+        from llm_evaluate.vllm.cls import SyncCausalLLM as CausalLLM
 
     return CausalLLM(config)
