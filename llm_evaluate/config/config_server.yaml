@@ -1,27 +1,29 @@
 data:
-  name: math_train      
-  data_path: /home/nfs06/shenyz/data/SimpleRL/hard/train_processed.parquet
+  name: llm_judge      
+  data_path: outputs/1/rollout/update_(Base_Greedy)_math_train__home_nfs06_shenyz_models_Qwen2.5-1.5B_math_train_base.jsonl
   subset_name: null
   split: train
-  num_samples: 512
-  builder: parquet
+  num_samples: null
+  builder: json
+  save_columns: true # For llm_judge, we need to keep all original columns.
+exp_name_prefix: "(Base_Greedy)"
 
 evaluate:
-  val_size: 1024
+  val_size: 512
   num_proc: null
   metrics:
     - union_math_accuracy
   eval_func: base
-  merge_strategy: pass
+  merge_strategy: avg
 
-use_server: false
+use_server: true
 
 # /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+n_7+Qwen3-8B+256+gpus_8/global_step_160/actor/huggingface
 # /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
 # /home/nfs06/shenyz/models/Qwen2.5-1.5B
 llm:
-  model: /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_300/actor/huggingface
-  tokenizer: /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_300/actor/huggingface
+  model: deepseek-chat
+  tokenizer: null
   trust_remote_code: true
   dtype: bfloat16
   gpu_memory_utilization: 0.7
@@ -29,7 +31,10 @@ llm:
   seed: 42
   
 
-server: {}
+server: 
+  ignore_proxy: false
+  api_key: 
+  base_url: https://api.deepseek.com/v1
 
 sample_params:
   offline:
@@ -38,15 +43,16 @@ sample_params:
     # top_p: 0.95 # 1.0
     # top_k: 20 # -1
     # repetition_penalty: 1.1 # 1
-    n: 8
+    n: 1
 
-  online: {}
+  online: 
+    temperature: 1.0 #0.0
+    max_tokens: 4096
 
 
 save_outputs: true # save format: jsonl
 outputs_dir: ./outputs/1/rollout
 
-exp_name_prefix: "__without_steps__"
 
 hydra:
   run:

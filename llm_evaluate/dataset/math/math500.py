@@ -21,7 +21,7 @@ class mathtrain(EvalDataset):
     prompt: str = "{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}."
     simple_prompt: str = "Question:{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}.\n\nAnswer:\n"
 
-    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None):
+    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None, **kwargs):
         """
         Initialize the GSM8K dataset wrapper.
 
@@ -73,7 +73,7 @@ class math500(EvalDataset):
     prompt: str = "{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}."
     simple_prompt: str = "Question:{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}.\n\nAnswer:\n"
 
-    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None):
+    def __init__(self, data_dir: str, subset_name=None, split: str = "train", builder=None, **kwargs):
         """
         Initialize the GSM8K dataset wrapper.
 

@@ -1,37 +1,43 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 import asyncio
-from typing import Any
+from typing import Any, Iterable
 
 import httpx
 from vllm import LLM, SamplingParams
 from openai import AsyncOpenAI
 from transformers import AutoTokenizer
 
+
+# ===== Base Class =====
+
 class CausalLLM(ABC):
+    """Abstract base class for all causal LLM implementations."""
     llm: Any = None  # type: ignore
 
     @abstractmethod
     def generate(self, prompts, **kwargs):
-        pass
+        """Generate responses from the language model."""
+        raise NotImplementedError
 
 
-def flatten_with_paths(data, path=()):
+# ===== Utilities =====
+
+def flatten_with_paths(data, path=()) -> list[tuple[tuple[int, ...], Any]]:
+    """Flatten nested lists while keeping index paths."""
     if isinstance(data, list):
         if not data:
             return [(path, [])]
-        if all(isinstance(x, (str, dict)) for x in data):
+        if all(isinstance(x, dict) for x in data):
             return [(path, data)]
-        res = []
-        for i, x in enumerate(data):
-            res.extend(flatten_with_paths(x, path + (i,)))
-        return res
-    else:
-        return [(path, data)]
+        return [p for i, x in enumerate(data) for p in flatten_with_paths(x, path + (i,))]
+    return [(path, data)]
 
 
 def reconstruct_from_paths(paths, values):
+    """Reconstruct nested list structure from flattened paths."""
     res = {}
-    for (path, value) in zip(paths, values):
+    for path, value in zip(paths, values):
         d = res
         for p in path[:-1]:
             d = d.setdefault(p, {})
@@ -41,119 +47,150 @@ def reconstruct_from_paths(paths, values):
         if not isinstance(d, dict):
             return d
         if not d:
-            return [] 
+            return []
         max_idx = max(d.keys())
         return [dict_to_list(d.get(i, [])) for i in range(max_idx + 1)]
 
     return dict_to_list(res)
 
 
+def check_item_valid(item: Any) -> bool:
+    """Check if item is valid: a string or a list of dicts."""
+    return isinstance(item, str) or (
+        isinstance(item, list) and all(isinstance(x, dict) for x in item)
+    )
 
 
+def validate_prompts(prompts: Iterable[Any]) -> tuple[bool, int]:
+    """Validate prompt structure and determine list flattening behavior."""
+    if all(check_item_valid(x) for x in prompts):
+        return True, 1  # Normal case
+    if all(isinstance(x, list) for x in prompts):
+        if not all(all(check_item_valid(y) for y in x) for x in prompts):
+            raise ValueError(
+                "Each inner list must contain only valid items "
+                "(string or list of dicts)."
+            )
+        return False, 0  # Multi-generation, no num_generations
+    raise ValueError(
+        "Each prompt must be a string or a list of dicts. "
+        "Alternatively, provide a list of prompts for multi-generation."
+    )
 
-class syncCausalLLM(CausalLLM):
 
-    def __init__(self, config) -> None:
-        self.llm = LLM(enable_sleep_mode=True, **config["llm"])
-        self.tokenizer = AutoTokenizer.from_pretrained(config["llm"]["tokenizer"])
+# ===== Sync Implementation =====
+
+class SyncCausalLLM(CausalLLM):
+    """Synchronous causal LLM using vLLM backend."""
+
+    def __init__(self, config: dict) -> None:
         self.config = config
+        print(f"Initializing SyncCausalLLM...\n Got config: {config['llm']}")
+        self.llm = LLM(enable_sleep_mode=True, **config["llm"])
+        tokenizer_path = config.llm.get("tokenizer", config["llm"]["model"])
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        self.tokenize_args = config.get("tokenize_args", {})
 
     def generate(self, prompts) -> list[list[str]]:
         sampling_params = SamplingParams(**self.config["sample_params"]["offline"])
+        _, n = validate_prompts(prompts)
+        list_remove = n == 0
+        if list_remove:
+            if sampling_params.n != 1:
+                print("Note: Generating multiple responses per prompt.So n must be set to 1.")
+            sampling_params.n = 1
 
         paths, flat = zip(*flatten_with_paths(prompts))
-        vllm_inputs = []
-        for prompt in flat:
+        vllm_inputs, empty_idx = [], []
+
+        for i, prompt in enumerate(flat):
+            if isinstance(prompt, list) and not prompt:
+                empty_idx.append(i)
+                continue
             if isinstance(prompt, list):
                 prompt = self.tokenizer.apply_chat_template(
-                    prompt, tokenize=False, add_generation_prompt=True
+                    prompt, tokenize=False, add_generation_prompt=True, **self.tokenize_args
                 )
             elif not isinstance(prompt, str):
-                raise ValueError("Prompt must be a string or a list of dict.")
+                raise ValueError("Prompt must be a string or list of dicts.")
             vllm_inputs.append(prompt)
+        responses = self.llm.generate(vllm_inputs, sampling_params=sampling_params)
 
-        resps = self.llm.generate(vllm_inputs, sampling_params=sampling_params)
+        results = []
+        for r in responses:
+            texts = [out.text.strip() for out in r.outputs]
+            results += texts if list_remove else [texts]
 
-        ret = []
-        for r in resps:
-            _ret = []
-            for i in range(len(r.outputs)):
-                _ret += [r.outputs[i].text.strip()]
-            ret += [_ret]
-        
-        return reconstruct_from_paths(paths, ret)
+        for idx in empty_idx:
+            assert list_remove
+            results.insert(idx, [])
+
+        final = reconstruct_from_paths(paths, results)
+        return final
 
 
-class asyncCausalLLM(CausalLLM):
+# ===== Async Implementation =====
 
-    def __init__(self, config) -> None:
+class AsyncCausalLLM(CausalLLM):
+    """Asynchronous causal LLM using OpenAI-compatible API."""
+
+    def __init__(self, config: dict) -> None:
+        self.config = config
         server_cfg = dict(config["server"])
         ignore_proxy = server_cfg.pop("ignore_proxy", False)
 
-        print("connect to server with config:", server_cfg)
-        if ignore_proxy:
-            self.llm = AsyncOpenAI(
-                **server_cfg,
-                http_client=httpx.AsyncClient(
-                    transport=httpx.AsyncHTTPTransport(proxy=None)
-                )
-            )
-        else:
-            self.llm = AsyncOpenAI(**server_cfg)
-        self.config = config
-        self.sampling_params = config["sample_params"]["online"]
-        self.model = self.config["llm"].get("model", None)
+        print(f"Connecting to server with config: {server_cfg}")
+        client_args = {"transport": httpx.AsyncHTTPTransport(proxy=None)} if ignore_proxy else {}
+        self.llm = AsyncOpenAI(**server_cfg, http_client=httpx.AsyncClient(**client_args))
 
-        if self.model is None:
-
-            models_list = self.llm.models.list()
-            if not any(self.model == x.id for x in models_list.data):
-                self.model = models_list.data[0].id
-                print(f"Warning: model {self.config['llm'].get('model', None)} not found, "
-                    f"using {self.model} instead.")
+        self.sampling_params = dict(config["sample_params"]["online"])
+        self.n = self.sampling_params.pop("n", 1)
+        self.model = config["llm"].get("model")
 
     async def _generate(self, prompts) -> list[str]:
-        # [TODO] update to list[list[str]]
+        valid_type, n = validate_prompts(prompts)
+        list_remove = not valid_type
+        if list_remove:
+            if self.n != 1:
+                print("Note: Generating multiple responses per prompt.So n must be set to 1.")
+            self.n = 1
 
-        tasks = []
-        params = dict(self.sampling_params).copy()
-        n = params.pop("n", 1)
-
-        # print(prompts)
         paths, flat = zip(*flatten_with_paths(prompts))
-        empty_prompts_idx = [] 
+        empty_idx, tasks = [], []
 
         for i, prompt in enumerate(flat):
-            if not isinstance(prompt, (str, list)):
-                raise ValueError("Prompt must be a string or a list of dict.")
-
-            if isinstance(prompt, list) and len(prompt) == 0:
-                empty_prompts_idx.append(i)
+            if isinstance(prompt, list) and not prompt:
+                empty_idx.append(i)
                 continue
-
-            for _ in range(n):
+            if not isinstance(prompt, (str, list)):
+                raise ValueError("Prompt must be a string or list of dicts.")
+            for _ in range(self.n):
                 tasks.append(
                     self.llm.chat.completions.create(
                         model=self.model,
                         messages=prompt,
-                        **self.config["sample_params"]["online"]
+                        **self.config["sample_params"]["online"],
+                        timeout=120,
                     )
                 )
 
-        results = await asyncio.gather(*tasks)
+        responses = await asyncio.gather(*tasks)
 
-        for idx in empty_prompts_idx:
-            for _ in range(n):
-                results.insert(idx * n, [])
+        for idx in empty_idx:
+            assert list_remove
+            responses.insert(idx, [])
 
-        ret = []
-        for i in range(0, len(results), n):
-            ret += [r.choices[0].message.content.strip() if hasattr(r, "choices") else r for r in results[i:i+n]]
-        ret = reconstruct_from_paths(paths, ret)
-        print(ret)
-        return ret
+        results = []
+        for i in range(0, len(responses), self.n):
+            segment = [
+                r.choices[0].message.content.strip()
+                if hasattr(r, "choices") else r
+                for r in responses[i : i + self.n]
+            ]
+            results += segment if list_remove else [segment]
+
+        final = reconstruct_from_paths(paths, results)
+        return final
 
     def generate(self, prompts) -> list[str]:
         return asyncio.run(self._generate(prompts))
-    
-

@@ -1,0 +1,5 @@
+name: wmt24
+data_path: /home/nfs06/shenyz/data/wmt24
+subset_name: en-zh_CN
+split: train
+num_samples: null

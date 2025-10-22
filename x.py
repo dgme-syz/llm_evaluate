@@ -1,51 +1,34 @@
-def flatten_with_paths(data, path=()):
-    """将三维嵌套结构展平成 (path, value) 的列表"""
-    if not isinstance(data, list):
-        return [(path, data)]
-    res = []
-    for i, x in enumerate(data):
-        res.extend(flatten_with_paths(x, path + (i,)))
-    return res
+
+from comet import download_model, load_from_checkpoint
+
+from comet.models.utils import Prediction
+import torch
+torch.serialization.add_safe_globals([Prediction])
 
 
-def reconstruct_from_paths(paths, values):
-    """根据路径信息将 values 还原成原始嵌套结构"""
-    from copy import deepcopy
-    # 找出最大深度的索引结构
-    res = {}
-    for (p, v) in zip(paths, values):
-        d = res
-        for i in p[:-1]:
-            d = d.setdefault(i, {})
-        d[p[-1]] = v
+print("Comet Worker Test >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+if __name__ == '__main__':
+        model_path = download_model("Unbabel/wmt22-comet-da")
+        # or for example:
+        # model_path = download_model("Unbabel/wmt22-comet-da")
 
-    # 递归地将 dict 转回 list
-    def dict_to_list(d):
-        if not isinstance(d, dict):
-            return d
-        max_idx = max(d.keys())
-        return [dict_to_list(d[i]) for i in range(max_idx + 1)]
+        # Load the model checkpoint:
+        model = load_from_checkpoint(model_path)
 
-    return dict_to_list(res)
+        # Data must be in the following format:
+        data = [
+                {
+                                "src": "10 到 15 分钟可以送到吗",
+                                        "mt": "Can I receive my food in 10 to 15 minutes?",
+                                                "ref": "Can it be delivered between 10 to 15 minutes?"
+                                                },
+                        {
+                                "src": "Pode ser entregue dentro de 10 a 15 minutos?",
+                                        "mt": "Can you send it for 10 to 15 minutes?",
+                                                "ref": "Can it be delivered between 10 to 15 minutes?"
+                                                        }
+                        ]
+        # Call predict method:
 
-
-# ==== 示例 ====
-
-data = [
-    1, 2, 3
-]
-
-# 1️⃣ 拍平数据
-flat_with_paths = flatten_with_paths(data)
-paths, flat = zip(*flat_with_paths)
-
-# 2️⃣ 调用处理函数
-def process(flat):
-    return [[x, x * 10] for x in flat]
-
-processed = process(flat)
-
-# 3️⃣ 还原结构
-restored = reconstruct_from_paths(paths, processed)
-import json
-print(json.dumps(restored, indent=2))
+        model_output = model.predict(data, batch_size=8, gpus=2)
+        print(model_output)
