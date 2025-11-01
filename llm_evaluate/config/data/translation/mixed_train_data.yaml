@@ -1,5 +1,5 @@
-name: wmt24
-data_path: /home/nfs06/shenyz/data/wmt24
+name: train_mixed
+data_path: /home/nfs06/shenyz/data/mt_mixed_data
 subset_name: en-zh_CN
 split: train
 num_samples: null
@@ -7,3 +7,6 @@ generate_args:
   translation_options:
     source_lang: auto
     target_lang: Chinese
+dataset_args:
+  src_key: en
+  tgt_key: zh

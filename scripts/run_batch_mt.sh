@@ -8,14 +8,16 @@ set -euo pipefail
 # - Adds retry logic
 # ----------------------------------------
 
+THINKING="++evaluate.eval_func_args.use_thinking=false_mixed_data"
+
 declare -A models
-# models["Seed-X-PPO-7B"]="/home/nfs05/shenyz/models/Seed-X-PPO-7B sample_params.offline.temperature=0.0"
-models["Hunyuan-MT-7B"]="/home/nfs05/shenyz/models/Hunyuan-MT-7B sample_params.offline.temperature=0.7 sample_params.offline.top_p=0.6 sample_params.offline.top_k=20 sample_params.offline.repetition_penalty=1.05"
-# models["Qwen3-8B"]="/home/nfs06/shenyz/models/Qwen3-8B sample_params.offline.temperature=0.6 sample_params.offline.top_p=0.95 sample_params.offline.top_k=20"
-# models["Qwen2.5-7B-Instruct"]="/home/nfs06/shenyz/models/Qwen2.5-7B-Instruct sample_params.offline.repetition_penalty=1.05 sample_params.offline.temperature=0.7 sample_params.offline.top_p=0.8 sample_params.offline.top_k=20"
-# models["Qwen3-0.6B"]="/home/nfs06/shenyz/models/Qwen3-0.6B sample_params.offline.temperature=0.6 sample_params.offline.top_p=0.95 sample_params.offline.top_k=20"
-# models["Qwen3-4B"]="/home/nfs06/shenyz/models/Qwen3-4B sample_params.offline.temperature=0.6 sample_params.offline.top_p=0.95 sample_params.offline.top_k=20"
-# models["Qwen3-4B-Thinking-2507"]="/home/nfs05/shenyz/models/Qwen3-4B-Thinking-2507 sample_params.offline.temperature=0.6 sample_params.offline.top_p=0.95 sample_params.offline.top_k=20 sample_params.offline.max_tokens=8192"
+# models["Seed-X-PPO-7B"]="/home/nfs05/shenyz/models/Seed-X-PPO-7B generate_params.offline.sampling_params.temperature=0.0 ++llm.prompt_template=seed_x_mt"
+# models["Hunyuan-MT-7B"]="/home/nfs05/shenyz/models/Hunyuan-MT-7B generate_params.offline.sampling_params.temperature=0.7 generate_params.offline.sampling_params.top_p=0.6 generate_params.offline.sampling_params.top_k=20 generate_params.offline.sampling_params.repetition_penalty=1.05 ++llm.prompt_template=hunyuan_mt_chat"
+models["Qwen3-8B"]="/home/nfs06/shenyz/models/Qwen3-8B generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+models["Qwen2.5-7B-Instruct"]="/home/nfs06/shenyz/models/Qwen2.5-7B-Instruct generate_params.offline.sampling_params.repetition_penalty=1.05 generate_params.offline.sampling_params.temperature=0.7 generate_params.offline.sampling_params.top_p=0.8 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+models["Qwen3-0.6B"]="/home/nfs06/shenyz/models/Qwen3-0.6B generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+models["Qwen3-4B"]="/home/nfs06/shenyz/models/Qwen3-4B generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-4B-Thinking-2507"]="/home/nfs05/shenyz/models/Qwen3-4B-Thinking-2507 generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 generate_params.offline.sampling_params.max_tokens=8192 ++llm.prompt_template=qwen_think_mt"
 
 LOG_DIR="./logs"
 mkdir -p "$LOG_DIR"
@@ -29,12 +31,12 @@ for model_name in "${!models[@]}"; do
     task_idx=$((task_idx + 1))
     model_path=$(echo "${models[$model_name]}" | awk '{print $1}')
     model_extra=$(echo "${models[$model_name]}" | cut -d' ' -f2-)
-    log_name="${LOG_DIR}/mt_${model_name}.log"
+    start_time=$(date +%s)
+    log_name="${LOG_DIR}/mt_${model_name}_${THINKING}.log"
 
     echo "──────────────────────────────────────────────"
     echo "▶ [${task_idx}/${total_models}] Running $model_name"
     echo "   Log: $log_name"
-    start_time=$(date +%s)
 
     # Retry mechanism
     attempt=0

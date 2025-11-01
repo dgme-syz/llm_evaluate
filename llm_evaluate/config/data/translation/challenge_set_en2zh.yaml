@@ -3,3 +3,7 @@ data_path: /home/nfs06/shenyz/data/seed_x_challenge_set
 subset_name: en-zh_CN
 split: train
 num_samples: null
+generate_args:
+  translation_options:
+    source_lang: auto
+    target_lang: Chinese

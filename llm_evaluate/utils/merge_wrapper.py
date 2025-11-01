@@ -1,7 +1,7 @@
 from typing import Sequence, Literal
 
 from .metric.abstract import Metric
-
+from llm_evaluate.vllm.cls import flatten_with_paths, reconstruct_from_paths
 
 def decorator(obj: Metric, merge_strategy: Literal["avg", "pass", "total"] = "pass"):
 
@@ -9,16 +9,20 @@ def decorator(obj: Metric, merge_strategy: Literal["avg", "pass", "total"] = "pa
         ret = {}
 
         if merge_strategy == "total":
-            all_responses = [resp for resps in responses for resp in resps]
+            paths, all_responses = zip(*flatten_with_paths(responses))
             all_answers = [ans for ans, resps in zip(answers, responses) for _ in resps]
-            res = obj(all_responses, all_answers, extra_infos)
+            all_extra_infos = [info for info, resps in zip(extra_infos, responses) for _ in resps]
+            res = obj(all_responses, all_answers, all_extra_infos)
 
             if "score" not in res:
                 raise ValueError(f"Metric must have a single 'score' key. Got {res.keys()} instead.")
 
             if isinstance(res["score"], (int, float)):
                 ret.update({"score": res["score"]})
-                ret.update({"extra_dict": res.get("extra_dict", {})})
+                tmp = res.get("extra_dict", {})
+                for k, v in tmp.items():
+                    tmp[k] = reconstruct_from_paths(paths, v)
+                ret.update({"extra_dict": tmp})
             else:
                 raise NotImplementedError("Metric returning list is not supported for 'total' strategy.")
 

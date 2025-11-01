@@ -2,9 +2,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import asyncio
 from typing import Any, Iterable
-
 import httpx
 from vllm import LLM, SamplingParams
+from vllm.sampling_params import BeamSearchParams
+
 from openai import AsyncOpenAI
 from transformers import AutoTokenizer
 
@@ -85,20 +86,28 @@ class SyncCausalLLM(CausalLLM):
 
     def __init__(self, config: dict) -> None:
         self.config = config
-        print(f"Initializing SyncCausalLLM...\n Got config: {config['llm']}")
-        self.llm = LLM(enable_sleep_mode=True, **config["llm"])
-        tokenizer_path = config.llm.get("tokenizer", config["llm"]["model"])
+        print(f"Initializing SyncCausalLLM...\n Got config: {config.llm.vllm}")
+        self.llm = LLM(enable_sleep_mode=True, **config.llm.vllm)
+        tokenizer_path = config.llm.vllm.get("tokenizer", config.llm.vllm.model)
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-        self.tokenize_args = config.get("tokenize_args", {})
+        self.tokenize_args = dict(config.get("tokenize_args", {}))
 
     def generate(self, prompts) -> list[list[str]]:
-        sampling_params = SamplingParams(**self.config["sample_params"]["offline"])
+        beam_serach = False
+
+        if self.config.generate_params.offline.get("use_beam_search", False):
+            beam_serach = True
+            sampling_params = BeamSearchParams(**self.config.generate_params.offline.beam_search_params)
+        else:
+            sampling_params = SamplingParams(**self.config.generate_params.offline.sampling_params)
+
         _, n = validate_prompts(prompts)
         list_remove = n == 0
         if list_remove:
-            if sampling_params.n != 1:
+            if hasattr(sampling_params, "n") and sampling_params.n != 1:
                 print("Note: Generating multiple responses per prompt.So n must be set to 1.")
-            sampling_params.n = 1
+            if hasattr(sampling_params, "n"):
+                sampling_params.n = 1
 
         paths, flat = zip(*flatten_with_paths(prompts))
         vllm_inputs, empty_idx = [], []
@@ -114,7 +123,10 @@ class SyncCausalLLM(CausalLLM):
             elif not isinstance(prompt, str):
                 raise ValueError("Prompt must be a string or list of dicts.")
             vllm_inputs.append(prompt)
-        responses = self.llm.generate(vllm_inputs, sampling_params=sampling_params)
+        if beam_serach == False:
+            responses = self.llm.generate(vllm_inputs, sampling_params)
+        else:
+            responses = self.llm.beam_search(vllm_inputs, sampling_params)
 
         results = []
         for r in responses:
@@ -136,19 +148,27 @@ class AsyncCausalLLM(CausalLLM):
 
     def __init__(self, config: dict) -> None:
         self.config = config
-        server_cfg = dict(config["server"])
-        ignore_proxy = server_cfg.pop("ignore_proxy", False)
+        server_cfg = config["server"]
 
         print(f"Connecting to server with config: {server_cfg}")
-        client_args = {"transport": httpx.AsyncHTTPTransport(proxy=None)} if ignore_proxy else {}
-        self.llm = AsyncOpenAI(**server_cfg, http_client=httpx.AsyncClient(**client_args))
+        client_args = {"transport": httpx.AsyncHTTPTransport(proxy=None)} if server_cfg.ignore_proxy else {}
+        self.llm = AsyncOpenAI(**server_cfg.openai_args, http_client=httpx.AsyncClient(**client_args))
 
-        self.sampling_params = dict(config["sample_params"]["online"])
+        self.sampling_params = dict(config.generate_params.online)
         self.n = self.sampling_params.pop("n", 1)
-        self.model = config["llm"].get("model")
+        self.model = server_cfg.get("model")
+
+    def merge_data_args(self, new_args: dict) -> None:
+        # Sometimes, we need to use args about dataset.
+        # Now, our main script hope to use one model to test more datasets.
+        # new_args need to be the content of "generate_args"
+
+        self.sampling_params.setdefault("extra_body", {}).update(new_args)
+    def update_sampling_params(self, backup: dict) -> None:
+        self.sampling_params = backup
 
     async def _generate(self, prompts) -> list[str]:
-        valid_type, n = validate_prompts(prompts)
+        valid_type, _ = validate_prompts(prompts)
         list_remove = not valid_type
         if list_remove:
             if self.n != 1:
@@ -169,7 +189,7 @@ class AsyncCausalLLM(CausalLLM):
                     self.llm.chat.completions.create(
                         model=self.model,
                         messages=prompt,
-                        **self.config["sample_params"]["online"],
+                        **self.sampling_params,
                         timeout=120,
                     )
                 )

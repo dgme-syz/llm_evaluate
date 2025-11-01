@@ -1,50 +1,66 @@
 data:
-  - data/translation/challenge_set_en2zh
-  - data/translation/challenge_set_zh2en
-  - data/translation/wmt24_en2zh
-  - data/translation/wmt24_en2id
-  - data/translation/flores_en2ja
-  - data/translation/flores_zh2ja
+  # - data/translation/mixed_train_data
+  # - data/translation/challenge_set_en2zh
+  # - data/translation/wmt24_en2zh
   - data/translation/flores_en2zh
+  # - data/translation/challenge_set_zh2en
+  # - data/translation/wmt24_en2id
+  # - data/translation/flores_en2ja
+  # - data/translation/flores_zh2ja
+  # - data/translation/flores_zh2hr
 
 evaluate:
-  val_size: 10000
+  val_size: 4096
   num_proc: null
   metrics:
     - BLEU
-    - cometkiwi
-    - comet-22
-  eval_func: base
+    # - cometkiwi
+    # - comet-22
+  eval_func: recheck
+  eval_func_args:
+    check_num: 0
+    use_thinking: false
   merge_strategy: total
 
 use_server: false
 
 llm:
-  model: /home/nfs05/shenyz/models/Qwen3-0.6B
-  tokenizer: /home/nfs05/shenyz/models/Qwen3-0.6B
-  trust_remote_code: true
-  dtype: bfloat16
-  gpu_memory_utilization: 0.8
-  tensor_parallel_size: 4
-  seed: 42
-  enable_chunked_prefill: true # 
-  max_model_len: 16384
+  prompt_template: qwen_chat_mt
+  vllm:
+    model: /home/nfs05/shenyz/models/Qwen3-0.6B
+    tokenizer: /home/nfs05/shenyz/models/Qwen3-0.6B
+    trust_remote_code: true
+    dtype: bfloat16
+    gpu_memory_utilization: 0.8
+    tensor_parallel_size: 4
+    seed: 42
+    enable_chunked_prefill: false 
+    enable_prefix_caching: false
+    max_model_len: 16384
 
 tokenize_args:
   enable_thinking: false
 
 server: {}
 
-sample_params:
+generate_params:
   offline:
-    max_tokens: 1024
-    top_k: 20
-    top_p: 0.95
-    temperature: 0.6
-    repetition_penalty: 1.0
-  online: {}
+    use_beam_search: false
+    sampling_params:
+      max_tokens: 4096
+      top_k: 20
+      top_p: 0.95
+      temperature: 0.6
+      repetition_penalty: 1.0
+      seed: 42
+    beam_search_params:
+      beam_width: 4
+      max_tokens: 1024
+  online: 
+    max_tokens: 512
+    
 
 
 save_outputs: true # save format: jsonl
-outputs_dir: ./outputs/mt/
+outputs_dir: ./outputs/mt_thinking/
 

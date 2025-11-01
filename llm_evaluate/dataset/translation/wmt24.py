@@ -1,10 +1,7 @@
 from llm_evaluate.dataset import EvalDataset, register
 from llm_evaluate.dataset.translation import (
-    qwen_chat_input, 
-    hunyuan_chat_input,
-    seed_x_ppo_input,
+    get_prompt_template,
     LANGUAGE_BY_CODE,
-    qwen_think_input
 )
 
 
@@ -37,6 +34,9 @@ class wmt24(EvalDataset):
         self.src_code = src_code
         self.tgt_code = tgt_code.split("_")[0]
         self.extra_args = extra_args or {}
+        if "prompt_template" not in self.extra_args:
+            raise ValueError("This dataset must need a standart prompt template.")
+        self.template_func = get_prompt_template(self.extra_args.get("prompt_template"))
 
     def convert_item(self, examples, **kwargs):
         """
@@ -50,19 +50,7 @@ class wmt24(EvalDataset):
         """
         src_text = examples["source"]
         tgt_text = examples["target"]
-
-        m = self.extra_args.get("model").lower()
-        if "qwen" in m:
-            if "think" not in m:
-                prompt = qwen_chat_input(self.src_lang, self.tgt_lang, src_text)
-            else:
-                prompt = qwen_think_input(self.src_lang, self.tgt_lang, src_text)
-        elif "hunyuan" in m:
-            prompt = hunyuan_chat_input(self.src_lang, self.tgt_lang, src_text)
-        elif "seed-x" in m:
-            prompt = seed_x_ppo_input(self.src_lang, self.tgt_lang, src_text)
-        else:
-            raise ValueError(f"Unsupported model {m} for challenge_set dataset.")
+        prompt = self.template_func(self.src_lang, self.tgt_lang, src_text)
         
         return {
             "data_source": "wmt24",
