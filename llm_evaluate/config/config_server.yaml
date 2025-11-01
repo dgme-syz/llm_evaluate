@@ -21,19 +21,11 @@ use_server: true
 # /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+n_7+Qwen3-8B+256+gpus_8/global_step_160/actor/huggingface
 # /home/nfs05/shenyz/verl/checkpoints/verl_grpo/Qwen2.5-1.5B+GRPO+256+gpus_4/global_step_460/actor/huggingface
 # /home/nfs06/shenyz/models/Qwen2.5-1.5B
-llm:
-  model: deepseek-chat
-  tokenizer: null
-  trust_remote_code: true
-  dtype: bfloat16
-  gpu_memory_utilization: 0.7
-  tensor_parallel_size: 2
-  seed: 42
-  
 
 server: 
+  model: deepseek-chat
   ignore_proxy: false
-  api_key: 
+  api_key: null
   base_url: https://api.deepseek.com/v1
 
 sample_params:

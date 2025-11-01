@@ -1,3 +1,4 @@
+import re
 import json
 import subprocess
 import tempfile
@@ -8,9 +9,9 @@ from llm_evaluate.utils.metric.registry import register
 from llm_evaluate.utils.metric.abstract import Metric
 
 
-import re
-
 def preprocess(text: str) -> str:
+    if not isinstance(text, str):
+        raise ValueError(f"{text} is not a str.")
     parts = re.split(r'</think\s*>', text, flags=re.IGNORECASE)
     text_after_think = parts[-1] if len(parts) > 1 else text
 

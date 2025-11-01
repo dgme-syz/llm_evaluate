@@ -3,3 +3,7 @@ data_path: /home/nfs06/shenyz/data/wmt24
 subset_name: en-id_ID
 split: train
 num_samples: null
+generate_args:
+  translation_options:
+    source_lang: auto
+    target_lang: Indonesian

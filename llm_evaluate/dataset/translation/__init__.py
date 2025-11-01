@@ -1,3 +1,6 @@
+from typing import Callable, Any
+from collections import OrderedDict
+
 LANG_DICT = {
     "en": "English", "zh": "Chinese (Simplified)", "hu": "Hungarian", "es": "Spanish", "fr": "French", "de": "German", "ru": "Russian", "ja": "Japanese", "th": "Thai", "sw": "Swahili", "bn": "Bengali", "te": "Telugu", "ar": "Arabic", "ko": "Korean", "vi": "Vietnamese", "cs": "Czech", "sr": "Cyrillic Serbian"
 }
@@ -195,6 +198,8 @@ ppo_lang_dict = {
     "Chinese (Simplified)": "zh",
 }
 
+
+
 def qwen_chat_input(src_lang_name, tgt_lang_name, src_text):
     user_input = (
         f"Translate the following text into {tgt_lang_name} "
@@ -202,9 +207,7 @@ def qwen_chat_input(src_lang_name, tgt_lang_name, src_text):
         f"{src_text}\n\n"
     )
 
-    return [
-        {"role": "user", "content": user_input},
-    ]
+    return [{"role": "user", "content": user_input}]
 
 def qwen_think_input(src_lang_name, tgt_lang_name, src_text):
     user_input = (
@@ -223,6 +226,9 @@ def qwen_think_input(src_lang_name, tgt_lang_name, src_text):
     return [
         {"role": "user", "content": user_input},
     ]
+
+def qwen_mt_input(src_lang_name, tgt_lang_name, src_text):
+    return [{"role": "user", "content": src_text}]
 
 def hunyuan_chat_input(src_lang_name, tgt_lang_name, src_text):
     # reference: https://arxiv.org/pdf/2509.05209
@@ -254,3 +260,35 @@ def seed_x_ppo_input(src_lang_name, tgt_lang_name, src_text):
     )
     return user_input
 
+
+PROMPT_TEMPLATE = OrderedDict[str, Callable](
+    [
+        ("qwen_chat_mt", qwen_chat_input),
+        ("qwen_think_mt", qwen_think_input),
+        ("qwen_mt_turbo", qwen_mt_input),
+        ("hunyuan_mt_chat", hunyuan_chat_input),
+        ("seed_x_mt", seed_x_ppo_input)
+    ]
+)
+
+def get_prompt_template(template_name: str) -> Callable[[str, str, str], Any]:
+    """
+    Retrieve the corresponding prompt template function by name.
+
+    Args:
+        template_name (str): The name of the template.
+
+    Returns:
+        Callable: The function corresponding to the specified template name.
+            Parameters:
+            src_lang_name (str): The source language name.
+            tgt_lang_name (str): The target language name.
+            src_text (str): The source text to be processed.
+
+    Raises:
+        ValueError: If the template name does not exist in the `PROMPT_TEMPLATE` dictionary.
+    """
+    if template_name not in PROMPT_TEMPLATE:
+        raise ValueError(f"Template {template_name} not found in prompt templates. Please check the name and try again.")
+
+    return PROMPT_TEMPLATE[template_name]

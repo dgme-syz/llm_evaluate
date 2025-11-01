@@ -9,3 +9,7 @@ split:
   - train
   - train
 num_samples: null
+generate_args:
+  translation_options:
+    source_lang: auto
+    target_lang: Chinese

@@ -5,14 +5,10 @@ from llm_evaluate.dataset.translation import (
 )
 
 
-@register("challenge_set")
-class challenge_set(EvalDataset):
-# name: challenge_set        
-# data_path: /home/nfs06/shenyz/data/seed_x_challenge_set
-# subset_name: en-zh_CN
-# split: train
+@register("train_mixed")
+class train_mixed_dataset(EvalDataset):
 
-    # https://github.com/ByteDance-Seed/Seed-X-7B/blob/main/challenge_set/Challenge_set_en2zh.json
+    # https://github.com/fzp0424/MT-R1-Zero/blob/main/data/train/json/train_enzh_6565.jsonl
     def __init__(self, data_dir, subset_name=None, split="train", builder=None, extra_args=None):
         """
         Initialize the WMT24 dataset wrapper.
@@ -36,7 +32,8 @@ class challenge_set(EvalDataset):
         if "prompt_template" not in self.extra_args:
             raise ValueError("This dataset must need a standart prompt template.")
         self.template_func = get_prompt_template(self.extra_args.get("prompt_template"))
-
+        self.src_key_name = extra_args.get("src_key")
+        self.tgt_key_name = extra_args.get("tgt_key")
 
     def convert_item(self, examples, **kwargs):
         """
@@ -48,8 +45,8 @@ class challenge_set(EvalDataset):
         Returns:
             dict: Structured item with prompt, ability, reward model, and extra info.
         """
-        src_text = examples["src_text"]
-        tgt_text = examples["参考译文"]
+        src_text = examples[self.src_key_name]
+        tgt_text = examples[self.tgt_key_name]
         prompt = self.template_func(self.src_lang, self.tgt_lang, src_text)
         
         return {

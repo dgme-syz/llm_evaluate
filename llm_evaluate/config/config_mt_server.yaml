@@ -1,0 +1,37 @@
+data:
+  - data/translation/challenge_set_en2zh
+  - data/translation/challenge_set_zh2en
+  # - data/translation/wmt24_en2zh
+  # - data/translation/wmt24_en2id
+  # - data/translation/flores_en2ja
+  # - data/translation/flores_zh2ja
+  # - data/translation/flores_en2zh
+  # - data/translation/flores_zh2hr
+
+evaluate:
+  val_size: 1
+  num_proc: null
+  metrics:
+    - BLEU
+    - cometkiwi
+    - comet-22
+  eval_func: base
+  merge_strategy: total
+
+use_server: true
+
+server: 
+  model: qwen-mt-turbo
+  prompt_template: qwen_chat_mt
+  ignore_proxy: false
+  openai_args:
+    api_key: null
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+
+generate_params:
+  online: 
+    max_tokens: 512
+    
+save_outputs: true # save format: jsonl
+outputs_dir: ./outputs/mt/
+

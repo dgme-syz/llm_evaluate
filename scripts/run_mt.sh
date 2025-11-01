@@ -3,6 +3,8 @@ set -e
 
 export TOKENIZERS_PARALLELISM=false
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
+export VLLM_ENABLE_V1_MULTIPROCESSING=0
+export TRANSFORMERS_OFFLINE=1
 # -------------------------------
 # 参数解析
 # -------------------------------
@@ -86,7 +88,7 @@ HYDRA_OVERRIDES=""
 
 # 如果指定了模型路径，先添加到 HYDRA_OVERRIDES
 if [ -n "$MODEL_PATH" ]; then
-    HYDRA_OVERRIDES="llm.model=$MODEL_PATH llm.tokenizer=$MODEL_PATH"
+    HYDRA_OVERRIDES="llm.vllm.model=$MODEL_PATH llm.vllm.tokenizer=$MODEL_PATH"
 fi
 
 # 如果有额外参数，也加进去
@@ -101,15 +103,14 @@ fi
 # -------------------------------
 # V100 特殊逻辑
 # -------------------------------
-export VLLM_USE_V1=0
 if echo "$GPU_NAME" | grep -q "V100"; then
     echo "[INFO] Detected V100 GPU, disabling unstable XLA/Torch optimizations..."
     export VLLM_ATTENTION_BACKEND=XFORMERS
 
     if [ -n "$HYDRA_OVERRIDES" ]; then
-        HYDRA_OVERRIDES="$HYDRA_OVERRIDES llm.enable_chunked_prefill=false llm.dtype=float32"
+        HYDRA_OVERRIDES="$HYDRA_OVERRIDES llm.vllm.enable_chunked_prefill=false llm.vllm.dtype=float32"
     else
-        HYDRA_OVERRIDES="llm.enable_chunked_prefill=false llm.dtype=float32"
+        HYDRA_OVERRIDES="llm.vllm.enable_chunked_prefill=false llm.vllm.dtype=float32"
     fi
 else
     echo "[INFO] Non-V100 GPU detected, running with default optimizations."
@@ -118,12 +119,12 @@ fi
 # -------------------------------
 # 自动设置 tensor_parallel_size
 # -------------------------------
-HYDRA_OVERRIDES="$HYDRA_OVERRIDES llm.tensor_parallel_size=$TP_SIZE"
+HYDRA_OVERRIDES="$HYDRA_OVERRIDES llm.vllm.tensor_parallel_size=$TP_SIZE"
 
 # -------------------------------
 # 执行 Python 命令
 # -------------------------------
-PY_CMD="VLLM_USE_V1=0 CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python3 -m llm_evaluate.main_eval --config-name config_mt"
+PY_CMD="CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python3 -m llm_evaluate.main_eval --config-name config_mt"
 
 if [ -n "$HYDRA_OVERRIDES" ]; then
     PY_CMD="$PY_CMD $HYDRA_OVERRIDES"
