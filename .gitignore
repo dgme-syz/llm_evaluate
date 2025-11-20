@@ -33,3 +33,5 @@ TestResults.xml
 *.jsonl
 *.pdf
 *.svg
+*.parquet
+temp/*

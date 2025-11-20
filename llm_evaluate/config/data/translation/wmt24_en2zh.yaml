@@ -10,3 +10,4 @@ generate_args:
 dataset_args:
   src_key: source
   tgt_key: target
+save: true

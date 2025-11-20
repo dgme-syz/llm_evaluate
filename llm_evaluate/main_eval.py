@@ -114,8 +114,11 @@ def compute_metrics_save_results(
             model_name = cfg.server.model
         else:
             model_name = cfg.llm.vllm.model.split("/")[-1] 
-        eval_args = OmegaConf.to_container(eval_cfg.get("eval_func_args"), resolve=True)
-        eval_args_str = json.dumps(eval_args, ensure_ascii=False, separators=(",", ":"))
+        if "eval_func_args" in eval_cfg:
+            eval_args = OmegaConf.to_container(eval_cfg.get("eval_func_args"), resolve=True)
+            eval_args_str = json.dumps(eval_args, ensure_ascii=False, separators=(",", ":"))
+        else:
+            eval_args_str = "no_args"
         filename = (
             f"{data_cfg.get('data_tag', '')}_"
             f"{data_cfg.subset_name}_{data_cfg.name}_"
@@ -146,8 +149,11 @@ def main_evaluate(cfg: DictConfig) -> None:
 
     # 2. Prepare evaluation configuration and metrics
     eval_cfg = getattr(cfg, "evaluate", {})
-    eval_func = get_eval(eval_cfg.get("eval_func"))(llm, **eval_cfg.eval_func_args)
+    _kwargs = {}
+    if hasattr(eval_cfg, "eval_func_args"):
+        _kwargs = eval_cfg.eval_func_args
 
+    eval_func = get_eval(eval_cfg.get("eval_func"))(llm, **_kwargs)
     # 3. Ensure cfg.data is a list for uniform processing
     cfg_data_raw = cfg.data if isinstance(cfg.data, ListConfig) else ListConfig([cfg.data])
     cfg_data = resolve_data_list_with_hydra(cfg_data_raw)
@@ -183,11 +189,15 @@ def main_evaluate(cfg: DictConfig) -> None:
             }
         )
 
+
         # 5. Preprocess dataset
         data = dataset.map(
             batched=False,
             save_columns=getattr(data_cfg, "save_columns", False)
         )
+        if data_cfg.get("save", False):
+            data.to_parquet(os.path.join("temp", f"{data_cfg.name}_{subset_name}.parquet"))
+            print(f"Saved processed dataset to temp/{data_cfg.name}_{subset_name}.parquet")
 
         # 6. Subsample for debugging if requested
         if (num_samples := getattr(data_cfg, "num_samples", None)):
