@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INPUT_FILE="/home/nfs05/shenyz/llm_evaluate/outputs/sft/challenge_set_en2zh_deepseek-reasoner_recheck_qwen3_0.6b.jsonl"
+INPUT_FILE="/home/nfs05/shenyz/llm_evaluate/outputs/sft/challenge_set_en2zh_deepseek-reasoner.jsonl"
 OUTPUT_PATH=/home/nfs06/shenyz/data/recheck_sft/
 NAME=dpsk-3.2-exp-qwen3-0.6b-challenge-set-en2zh-sft
 TEMPLATE_TYPE="recheck"

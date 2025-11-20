@@ -1,11 +1,11 @@
 data:
   # - data/translation/mixed_train_data
-  - data/translation/challenge_set_en2zh
-  - data/translation/wmt24_en2zh
-  - data/translation/flores_en2zh
-  # - data/translation/flores_data_sample
-  # - data/translation/wmt24_data_sample
-  # - data/translation/challenge_set_data_sample
+  # - data/translation/wmt24_en2zh
+  # - data/translation/challenge_set_en2zh
+  # - data/translation/flores_en2zh
+  - data/translation/flores_data_sample
+  - data/translation/wmt24_data_sample
+  - data/translation/challenge_set_data_sample
   # - data/translation/challenge_set_zh2en
   # - data/translation/wmt24_en2id
   # - data/translation/flores_en2ja
@@ -17,11 +17,11 @@ evaluate:
   val_size: 4096
   num_proc: null
   metrics:
-    - BLEU·
+    - BLEU
     - cometkiwi
   eval_func: recheck
   eval_func_args:
-    check_num: 3
+    check_num: 1
     use_thinking: true
     use_thinking_prompts: false
   merge_strategy: total
