@@ -1,25 +1,29 @@
 data:
   # - data/translation/mixed_train_data
-  # - data/translation/challenge_set_en2zh
-  # - data/translation/wmt24_en2zh
+  - data/translation/challenge_set_en2zh
+  - data/translation/wmt24_en2zh
   - data/translation/flores_en2zh
+  # - data/translation/flores_data_sample
+  # - data/translation/wmt24_data_sample
+  # - data/translation/challenge_set_data_sample
   # - data/translation/challenge_set_zh2en
   # - data/translation/wmt24_en2id
   # - data/translation/flores_en2ja
   # - data/translation/flores_zh2ja
   # - data/translation/flores_zh2hr
+  # - data/translation/data_sample
 
 evaluate:
   val_size: 4096
   num_proc: null
   metrics:
-    - BLEU
-    # - cometkiwi
-    # - comet-22
+    - BLEU·
+    - cometkiwi
   eval_func: recheck
   eval_func_args:
-    check_num: 0
-    use_thinking: false
+    check_num: 3
+    use_thinking: true
+    use_thinking_prompts: false
   merge_strategy: total
 
 use_server: false
@@ -48,11 +52,12 @@ generate_params:
     use_beam_search: false
     sampling_params:
       max_tokens: 4096
-      top_k: 20
-      top_p: 0.95
+      # top_k: 20
+      # top_p: 0.95
       temperature: 0.6
-      repetition_penalty: 1.0
+      # repetition_penalty: 1.0
       seed: 42
+      n: 1
     beam_search_params:
       beam_width: 4
       max_tokens: 1024
@@ -62,5 +67,5 @@ generate_params:
 
 
 save_outputs: true # save format: jsonl
-outputs_dir: ./outputs/mt_thinking/
+outputs_dir: ./outputs/mt_trained/
 

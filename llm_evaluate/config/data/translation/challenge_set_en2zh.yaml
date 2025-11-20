@@ -7,3 +7,6 @@ generate_args:
   translation_options:
     source_lang: auto
     target_lang: Chinese
+dataset_args:
+  src_key: src_text
+  tgt_key: 参考译文

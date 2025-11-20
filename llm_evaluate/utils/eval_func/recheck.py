@@ -1,3 +1,5 @@
+import re
+
 from .registry import register
 from .abstract import EvalFunc
 
@@ -20,7 +22,7 @@ def recheck_prompt(target_lang: str, src_text: str, pred_text: str, thinking: bo
 
         if not thinking:
             user_input += (
-                f"10. 不要输出多余思考内容，仅输出你润色后的内容\n\n"
+                f"10. 可以有思考过程，但是最终回复中仅输出你润色后的内容\n\n"
                 f"请返回你最后的润色翻译文本，不要输出多余内容。"
             )
         else:
@@ -63,53 +65,84 @@ def process_recheck_output(output: str, raw: str) -> str:
     if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
         return output[start_idx + len(start_tag):end_idx].strip()
     else:
-        if "think>" not in output:
-            return output
-        return raw
+        think_pattern = r"<think>.*?</think>"
+        output = re.sub(think_pattern, "", output, flags=re.DOTALL).strip()
+        return output if len(output) else raw
 
 @register("recheck")
 class ReCheckEvalFunc(EvalFunc):
-
     def __init__(self, llm, **kwargs):
         super().__init__(llm)
         self.check_num = kwargs.get("check_num", 5)
         self.use_thinking = kwargs.get("use_thinking", False)
+        self.use_thinking_prompts = kwargs.get("use_thinking_prompts", False)
+
+        print(
+            "ReCheckEvalFunc initialized with:\n"
+            f"  check_num = {self.check_num}\n"
+            f"  use_thinking = {self.use_thinking}\n"
+            f"  use_thinking_prompts = {self.use_thinking_prompts}\n"
+        )
 
     def evaluate(self, examples):
         """
-        Batch inference function:
-        - Input: examples containing "prompt"
-        - Output: updated prompts with assistant responses appended
+        Run batched evaluation with optional rechecking.
+
+        Args:
+            examples (dict): Contains:
+                - "prompt": list[str], input prompts.
+                - "response": (optional) list[list[str]], model outputs.
+                - "extra_info": list[dict], must include 'tgt_lang' and 'src'.
+
+        Returns:
+            dict: {
+                "response": list[list[str]],       # all rechecked results
+                "raw_response": list[list[str]],   # raw outputs before processing
+            }
         """
         batched_prompts = examples["prompt"]
-        current_pred_list = self.llm.generate(batched_prompts)
-
-        if isinstance(examples["extra_info"], list):
-            lang = examples["extra_info"][0]["tgt_lang"]
-            assert isinstance(lang, str)
-            src_list = [ x["src"] for x in examples["extra_info"] ]
+        current_pred_list = examples.get("response", None)
+        if current_pred_list is None:
+            current_pred_list = self.llm.generate(batched_prompts)
         else:
-            raise ValueError("should not reach here. We just support batched evaluate here.")
+            current_pred_list = [[x[0]] for x in current_pred_list]
 
-        assert len(current_pred_list[0]) == 1, "If you want to use ReCheckEvalFunc, num_generate should be 1."
-        current_pred_list = [x[0] for x in current_pred_list]
-        batched_responses = [ [x] for x in current_pred_list]
+        if not isinstance(examples.get("extra_info"), list):
+            raise ValueError("Expected 'extra_info' to be a list for batched evaluation.")
+
+        lang = examples["extra_info"][0].get("tgt_lang")
+        assert isinstance(lang, str), "'tgt_lang' must be a string."
+        src_list = [x["src"] for x in examples["extra_info"]]
+
+        batched_responses = [pred.copy() for pred in current_pred_list]
+        batched_responses_raw = [pred.copy() for pred in current_pred_list]
 
         if self.use_thinking:
-            bk = self.llm.tokenize_args["enable_thinking"]
+            original_thinking = self.llm.tokenize_args.get("enable_thinking", False)
             self.llm.tokenize_args["enable_thinking"] = True
 
         for _ in range(self.check_num):
-            new_batched_prompts = [
-                recheck_prompt(lang, src, pred, thinking=self.use_thinking) for src, pred in zip(src_list, current_pred_list)
+            new_prompts = [
+                recheck_prompt(lang, src, preds[0], thinking=self.use_thinking_prompts)
+                for src, preds in zip(src_list, current_pred_list)
             ]
-            _current_pred_list = self.llm.generate(new_batched_prompts)
-            current_pred_list = [process_recheck_output(x[0], y) for x, y in zip(_current_pred_list, current_pred_list)]
-            assert len(current_pred_list) == len(batched_responses)
-            for i in range(len(batched_responses)):
-                batched_responses[i].append(current_pred_list[i])
+            new_predictions = self.llm.generate(new_prompts)
+            processed_predictions = [
+                [process_recheck_output(new, old) for new, old in zip(new_batch, old_batch)]
+                for new_batch, old_batch in zip(new_predictions, current_pred_list)
+            ]
+
+            assert len(processed_predictions) == len(batched_responses)
+            for i, (proc, raw) in enumerate(zip(processed_predictions, new_predictions)):
+                batched_responses[i].extend(proc)
+                batched_responses_raw[i].extend(raw)
+
+            current_pred_list = processed_predictions
 
         if self.use_thinking:
-            self.llm.tokenize_args["enable_thinking"] = bk
+            self.llm.tokenize_args["enable_thinking"] = original_thinking
 
-        return {"response": batched_responses}
+        return {
+            "response": batched_responses,
+            "raw_response": batched_responses_raw,
+        }

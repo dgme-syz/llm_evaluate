@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -z "$DASHSCOPE_API_KEY" ]]; then
+if [[ -z "$DEEPSEEK_API_KEY" ]]; then
     echo "DASHSCOPE_API_KEY is not set!"
     exit 1
 fi
 
 declare -A models
-models["qwen-mt-turbo"]="'qwen-mt-turbo' server.api_key='${DASHSCOPE_API_KEY}' server.base_url='https://dashscope.aliyuncs.com/compatible-mode/v1' ++llm.prompt_template='qwen_mt_turbo'"
+models["deepseek-reasoner"]="'deepseek-reasoner' server.openai_args.api_key='${DEEPSEEK_API_KEY}' server.openai_args.base_url='https://api.deepseek.com/v1' ++llm.prompt_template='null'"
 
 
 LOG_DIR="./logs"

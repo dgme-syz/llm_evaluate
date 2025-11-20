@@ -10,6 +10,7 @@ from .math.math500 import mathtrain
 from .math.aime2024 import aime2024
 from .math.llm_judge import llm_judge
 from .math.aime2025 import aime2025
+from .translation.dummy import Dummydataset
 
 __all__ = [
     "EvalDataset",

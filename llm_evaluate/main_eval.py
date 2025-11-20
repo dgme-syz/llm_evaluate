@@ -1,5 +1,5 @@
 import os
-import gc
+import re
 import json
 from typing import Any
 from typing import List
@@ -16,6 +16,11 @@ from llm_evaluate.vllm.utils import build_model
 from llm_evaluate.utils.metric import get_metrics
 from llm_evaluate.utils.eval_func import get_eval
 from llm_evaluate.utils.merge_wrapper import decorator
+
+def safe_filename(s: str) -> str:
+    s = re.sub(r"[^a-zA-Z0-9._-]", "_", s)
+    s = re.sub(r"_+", "_", s)
+    return s.strip("_")
 
 def resolve_data_list_with_hydra(data_list: List[str]) -> List[DictConfig]:
     """
@@ -57,7 +62,7 @@ def compute_metrics_save_results(
     # 9. Compute metrics
     merge_strategy = eval_cfg.get("merge_strategy", "pass")
     num_generations = (
-        cfg.sample_params.online.get("n")
+        cfg.generate_params.online.get("n", 1)
         if cfg.get("use_server", False)
         else cfg.generate_params.offline.sampling_params.get("n", 1)
     )
@@ -109,18 +114,21 @@ def compute_metrics_save_results(
             model_name = cfg.server.model
         else:
             model_name = cfg.llm.vllm.model.split("/")[-1] 
-
+        eval_args = OmegaConf.to_container(eval_cfg.get("eval_func_args"), resolve=True)
+        eval_args_str = json.dumps(eval_args, ensure_ascii=False, separators=(",", ":"))
         filename = (
+            f"{data_cfg.get('data_tag', '')}_"
             f"{data_cfg.subset_name}_{data_cfg.name}_"
             f"{model_name}_"
-            f"{eval_cfg.get('eval_func')}"
-            f"{str(eval_cfg.get('eval_func_args'))}.jsonl"
+            f"{eval_cfg.get('eval_func')}_"
+            f"{eval_args_str}.jsonl"
         )
+        filename = safe_filename(filename)
         out_path = os.path.join(out_dir, filename)
 
         with open(out_path, "w", encoding="utf-8") as f:
             for item in tqdm(data, desc="Saving outputs"):
-                json.dump(item, f, ensure_ascii=False, indent=4)
+                json.dump(item, f, ensure_ascii=False)
                 f.write("\n")
 
         print(f"Saved outputs to: {out_path}")
@@ -171,7 +179,7 @@ def main_evaluate(cfg: DictConfig) -> None:
             extra_args={
                 "model": model_name,
                 "prompt_template": prompt_type,
-                **data_cfg.get("dataset_args"),
+                **data_cfg.get("dataset_args", {}),
             }
         )
 

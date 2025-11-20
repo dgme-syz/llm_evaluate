@@ -8,15 +8,21 @@ set -euo pipefail
 # - Adds retry logic
 # ----------------------------------------
 
-THINKING="++evaluate.eval_func_args.use_thinking=false_mixed_data"
+THINKING="++evaluate.eval_func_args.use_thinking=true"
 
 declare -A models
 # models["Seed-X-PPO-7B"]="/home/nfs05/shenyz/models/Seed-X-PPO-7B generate_params.offline.sampling_params.temperature=0.0 ++llm.prompt_template=seed_x_mt"
 # models["Hunyuan-MT-7B"]="/home/nfs05/shenyz/models/Hunyuan-MT-7B generate_params.offline.sampling_params.temperature=0.7 generate_params.offline.sampling_params.top_p=0.6 generate_params.offline.sampling_params.top_k=20 generate_params.offline.sampling_params.repetition_penalty=1.05 ++llm.prompt_template=hunyuan_mt_chat"
-models["Qwen3-8B"]="/home/nfs06/shenyz/models/Qwen3-8B generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
-models["Qwen2.5-7B-Instruct"]="/home/nfs06/shenyz/models/Qwen2.5-7B-Instruct generate_params.offline.sampling_params.repetition_penalty=1.05 generate_params.offline.sampling_params.temperature=0.7 generate_params.offline.sampling_params.top_p=0.8 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
-models["Qwen3-0.6B"]="/home/nfs06/shenyz/models/Qwen3-0.6B generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
-models["Qwen3-4B"]="/home/nfs06/shenyz/models/Qwen3-4B generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen2.5-7B-Instruct"]="/home/nfs06/shenyz/models/Qwen2.5-7B-Instruct generate_params.offline.sampling_params.repetition_penalty=1.05 generate_params.offline.sampling_params.temperature=0.7 generate_params.offline.sampling_params.top_p=0.8 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-0.6B"]="/home/nfs06/shenyz/models/ReCheck/Qwen3-0.6B+Thinking+mixed/ generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-4B"]="/home/nfs06/shenyz/models/Qwen3-4B generate_params.offline.sampling_params.temperature=0.6 ++generate_params.offline.sampling_params.top_p=0.95 ++generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-8B"]="/home/nfs06/shenyz/models/Qwen3-8B generate_params.offline.sampling_params.temperature=0.6 ++generate_params.offline.sampling_params.top_p=0.95 ++generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+#models["Qwen3-0.6B"]="/home/nfs06/shenyz/models/Qwen3-0.6B generate_params.offline.sampling_params.temperature=0.6 ++generate_params.offline.sampling_params.top_p=0.95 ++generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-0.6B-trained"]="/home/nfs05/shenyz/translation/verl/bs@128_n@8_@20251108_115419/global_step_230/actor/huggingface/ generate_params.offline.sampling_params.temperature=0.6 ++generate_params.offline.sampling_params.top_p=0.95 ++generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+models["Qwen3-4B-trained"]="/home/nfs05/shenyz/translation/verl/bs@128_n@8_m@2_@20251116_224613/global_step_100/actor/huggingface/ generate_params.offline.sampling_params.temperature=0.6 ++generate_params.offline.sampling_params.top_p=0.95 ++generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-0.6B-trained-pow3-data-plus"]="/home/nfs05/shenyz/translation/verl/bs@256_n@8_m@3_@20251114_184242/global_step_300/actor/huggingface generate_params.offline.sampling_params.temperature=0.6 ++generate_params.offline.sampling_params.top_p=0.95 ++generate_params.offline.sampling_params.top_k=20 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-4B-trained"]="/home/nfs06/shenyz/models/ReCheck/Qwen3-4B+Thinking+wmt24 generate_params.offline.sampling_params.temperature=1.0  ++llm.prompt_template=qwen_chat_mt ${THINKING}"
+# models["Qwen3-8B-trained"]="/home/nfs06/shenyz/models/ReCheck/Qwen3-8B+Thinking+wmt24 generate_params.offline.sampling_params.temperature=1.0 ++llm.prompt_template=qwen_chat_mt ${THINKING}"
 # models["Qwen3-4B-Thinking-2507"]="/home/nfs05/shenyz/models/Qwen3-4B-Thinking-2507 generate_params.offline.sampling_params.temperature=0.6 generate_params.offline.sampling_params.top_p=0.95 generate_params.offline.sampling_params.top_k=20 generate_params.offline.sampling_params.max_tokens=8192 ++llm.prompt_template=qwen_think_mt"
 
 LOG_DIR="./logs"
@@ -32,7 +38,7 @@ for model_name in "${!models[@]}"; do
     model_path=$(echo "${models[$model_name]}" | awk '{print $1}')
     model_extra=$(echo "${models[$model_name]}" | cut -d' ' -f2-)
     start_time=$(date +%s)
-    log_name="${LOG_DIR}/mt_${model_name}_${THINKING}.log"
+    log_name="${LOG_DIR}/mt_${model_name}_trained_${THINKING}.log"
 
     echo "──────────────────────────────────────────────"
     echo "▶ [${task_idx}/${total_models}] Running $model_name"

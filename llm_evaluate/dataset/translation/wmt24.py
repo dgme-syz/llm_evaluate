@@ -37,6 +37,8 @@ class wmt24(EvalDataset):
         if "prompt_template" not in self.extra_args:
             raise ValueError("This dataset must need a standart prompt template.")
         self.template_func = get_prompt_template(self.extra_args.get("prompt_template"))
+        self.src_key_name = extra_args.get("src_key")
+        self.tgt_key_name = extra_args.get("tgt_key")
 
     def convert_item(self, examples, **kwargs):
         """
@@ -48,8 +50,8 @@ class wmt24(EvalDataset):
         Returns:
             dict: Structured item with prompt, ability, reward model, and extra info.
         """
-        src_text = examples["source"]
-        tgt_text = examples["target"]
+        src_text = examples[self.src_key_name]
+        tgt_text = examples[self.tgt_key_name]
         prompt = self.template_func(self.src_lang, self.tgt_lang, src_text)
         
         return {
