@@ -1,6 +1,7 @@
 data:
-  - data/translation/challenge_set_en2zh
-  - data/translation/challenge_set_zh2en
+  - data/translation/wmt24_data_sample
+  #  - data/translation/flores_data_sample
+  - data/translation/challenge_set_data_sample
   # - data/translation/wmt24_en2zh
   # - data/translation/wmt24_en2id
   # - data/translation/flores_en2ja
@@ -9,20 +10,23 @@ data:
   # - data/translation/flores_zh2hr
 
 evaluate:
-  val_size: 1
+  val_size: 256
   num_proc: null
   metrics:
     - BLEU
-    - cometkiwi
-    - comet-22
-  eval_func: base
+    # - cometkiwi
+  eval_func: recheck
+  eval_func_args:
+    check_num: 1
+    use_thinking: true
+    use_thinking_prompts: false
   merge_strategy: total
 
 use_server: true
 
 server: 
   model: qwen-mt-turbo
-  prompt_template: qwen_chat_mt
+  prompt_template: null
   ignore_proxy: false
   openai_args:
     api_key: null
@@ -30,8 +34,8 @@ server:
 
 generate_params:
   online: 
-    max_tokens: 512
+    max_tokens: 4096
     
 save_outputs: true # save format: jsonl
-outputs_dir: ./outputs/mt/
+outputs_dir: ./outputs/sft/
 

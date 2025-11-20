@@ -157,6 +157,7 @@ class AsyncCausalLLM(CausalLLM):
         self.sampling_params = dict(config.generate_params.online)
         self.n = self.sampling_params.pop("n", 1)
         self.model = server_cfg.get("model")
+        self.tokenize_args = dict(config.get("tokenize_args", {})) # dummy
 
     def merge_data_args(self, new_args: dict) -> None:
         # Sometimes, we need to use args about dataset.
@@ -190,7 +191,7 @@ class AsyncCausalLLM(CausalLLM):
                         model=self.model,
                         messages=prompt,
                         **self.sampling_params,
-                        timeout=120,
+                        timeout=360,
                     )
                 )
 
@@ -200,13 +201,28 @@ class AsyncCausalLLM(CausalLLM):
             assert list_remove
             responses.insert(idx, [])
 
+        def warraper_think(rep: str) -> str:
+            if not rep:
+                return ""
+            t = []
+            if not rep.startswith("<think>"):
+                t.append("<think>")
+            t.append(rep)
+            if not rep.endswith("</think>"):
+                t.append("</think>")
+            return "\n".join(t)
+
         results = []
+        # print(dict(responses[0].choices[0]))
         for i in range(0, len(responses), self.n):
-            segment = [
-                r.choices[0].message.content.strip()
-                if hasattr(r, "choices") else r
-                for r in responses[i : i + self.n]
-            ]
+            segment = []
+            for r in responses[i : i + self.n]:
+                if hasattr(r, "choices") and r.choices:
+                    msg = r.choices[0].message
+                    content = getattr(msg, "reasoning_content",  "").strip()
+                    segment.append(warraper_think(content) + "\n\n" + getattr(msg, "content", "").strip())
+                else:
+                    segment.append(str(r))  # fallback
             results += segment if list_remove else [segment]
 
         final = reconstruct_from_paths(paths, results)

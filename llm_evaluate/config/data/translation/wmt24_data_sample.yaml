@@ -1,0 +1,8 @@
+name: dummy
+data_path: "/home/nfs06/shenyz/data/recheck/Qwen3-0.6B_wmt24_en_zh.parquet"
+subset_name: null
+split: train
+num_samples: null
+builder: parquet
+save_columns: true
+data_tag: "wmt24_en2zh"

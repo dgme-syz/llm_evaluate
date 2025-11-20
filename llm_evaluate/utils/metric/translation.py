@@ -15,7 +15,7 @@ def preprocess(text: str) -> str:
     parts = re.split(r'</think\s*>', text, flags=re.IGNORECASE)
     text_after_think = parts[-1] if len(parts) > 1 else text
 
-    match = re.search(r'<answer\s*>(.*?)</answer\s*>', text_after_think, flags=re.IGNORECASE | re.DOTALL)
+    match = re.search(r'<text\s*>(.*?)</text\s*>', text_after_think, flags=re.IGNORECASE | re.DOTALL)
     if match:
         extracted = match.group(1)
     else:
@@ -29,6 +29,7 @@ class BLEU(Metric):
     """SacreBLEU metric with language-specific tokenization."""
 
     def __call__(self, responses, references, extra_infos=None) -> float:
+
         responses = [preprocess(x) for x in responses]
         assert len(responses) == len(references), (
             "The number of translations should be equal to the number of references"

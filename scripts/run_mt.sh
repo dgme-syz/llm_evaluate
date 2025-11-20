@@ -4,7 +4,7 @@ set -e
 export TOKENIZERS_PARALLELISM=false
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
 export VLLM_ENABLE_V1_MULTIPROCESSING=0
-export TRANSFORMERS_OFFLINE=1
+export TRANSFORMERS_OFFLINE=0
 # -------------------------------
 # 参数解析
 # -------------------------------
