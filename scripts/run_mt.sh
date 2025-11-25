@@ -4,7 +4,7 @@ set -e
 export TOKENIZERS_PARALLELISM=false
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
 export VLLM_ENABLE_V1_MULTIPROCESSING=0
-export TRANSFORMERS_OFFLINE=0
+export TRANSFORMERS_OFFLINE=1
 # -------------------------------
 # 参数解析
 # -------------------------------
@@ -41,7 +41,7 @@ get_free_gpus() {
             --format=csv,noheader,nounits | while IFS=',' read -r idx total used util; do
                 mem_free_percent=$(( 100 - 100*used/total ))
                 util_int=${util// /}  # 去空格
-                if (( mem_free_percent >= 95 && util_int < 10 )); then
+                if (( mem_free_percent >= 98 && util_int < 10 )); then
                     echo $idx
                 fi
             done

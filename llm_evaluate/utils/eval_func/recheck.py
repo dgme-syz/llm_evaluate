@@ -102,8 +102,11 @@ class ReCheckEvalFunc(EvalFunc):
         """
         batched_prompts = examples["prompt"]
         current_pred_list = examples.get("response", None)
+        batched_responses_raw = None
         if current_pred_list is None:
             current_pred_list = self.llm.generate(batched_prompts)
+            batched_responses_raw = [pred.copy() for pred in current_pred_list]
+            current_pred_list = [[process_recheck_output(x[0], x[0])] for x in current_pred_list]
         else:
             current_pred_list = [[x[0]] for x in current_pred_list]
 
@@ -115,11 +118,12 @@ class ReCheckEvalFunc(EvalFunc):
         src_list = [x["src"] for x in examples["extra_info"]]
 
         batched_responses = [pred.copy() for pred in current_pred_list]
-        batched_responses_raw = [pred.copy() for pred in current_pred_list]
+        if batched_responses_raw is None:
+            batched_responses_raw = [pred.copy() for pred in current_pred_list]
 
         if self.use_thinking:
-            original_thinking = self.llm.tokenize_args.get("enable_thinking", False)
-            self.llm.tokenize_args["enable_thinking"] = True
+            original_thinking = self.llm.get_tokenize_args().get("enable_thinking", False)
+            self.llm.update_tokenize_args({"enable_thinking": True})
 
         for _ in range(self.check_num):
             new_prompts = [
@@ -140,7 +144,7 @@ class ReCheckEvalFunc(EvalFunc):
             current_pred_list = processed_predictions
 
         if self.use_thinking:
-            self.llm.tokenize_args["enable_thinking"] = original_thinking
+            self.llm.update_tokenize_args({"enable_thinking": original_thinking})
 
         return {
             "response": batched_responses,

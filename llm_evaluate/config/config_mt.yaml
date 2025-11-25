@@ -1,11 +1,12 @@
 data:
   # - data/translation/mixed_train_data
-  # - data/translation/wmt24_en2zh
-  # - data/translation/challenge_set_en2zh
-  # - data/translation/flores_en2zh
-  - data/translation/flores_data_sample
-  - data/translation/wmt24_data_sample
-  - data/translation/challenge_set_data_sample
+  # - data/translation/wmt25_en2zh
+  - data/translation/wmt24_en2zh
+  - data/translation/challenge_set_en2zh
+  - data/translation/flores_en2zh
+  # - data/translation/flores_data_sample
+  # - data/translation/wmt24_data_sample
+  # - data/translation/challenge_set_data_sample
   # - data/translation/challenge_set_zh2en
   # - data/translation/wmt24_en2id
   # - data/translation/flores_en2ja
@@ -17,8 +18,12 @@ evaluate:
   val_size: 4096
   num_proc: null
   metrics:
+    - sentenceBLEU
     - BLEU
     - cometkiwi
+    - BLEURT
+  metrics_args:
+    ignore_columns: []
   eval_func: recheck
   eval_func_args:
     check_num: 1
@@ -30,6 +35,7 @@ use_server: false
 
 llm:
   prompt_template: qwen_chat_mt
+  exp_tag: default
   vllm:
     model: /home/nfs05/shenyz/models/Qwen3-0.6B
     tokenizer: /home/nfs05/shenyz/models/Qwen3-0.6B
@@ -67,5 +73,5 @@ generate_params:
 
 
 save_outputs: true # save format: jsonl
-outputs_dir: ./outputs/mt_trained/
+outputs_dir: ./outputs/trained/
 

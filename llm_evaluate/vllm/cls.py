@@ -5,7 +5,8 @@ from typing import Any, Iterable
 import httpx
 from vllm import LLM, SamplingParams
 from vllm.sampling_params import BeamSearchParams
-
+        
+import gc, torch
 from openai import AsyncOpenAI
 from transformers import AutoTokenizer
 
@@ -20,6 +21,12 @@ class CausalLLM(ABC):
     def generate(self, prompts, **kwargs):
         """Generate responses from the language model."""
         raise NotImplementedError
+
+    def kill(self):
+        """Clean up resources if necessary."""
+        del self.llm
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 # ===== Utilities =====
@@ -92,6 +99,12 @@ class SyncCausalLLM(CausalLLM):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         self.tokenize_args = dict(config.get("tokenize_args", {}))
 
+    def get_tokenize_args(self) -> dict:
+        return self.tokenize_args
+
+    def update_tokenize_args(self, new_args: dict) -> None:
+        self.tokenize_args.update(new_args)
+
     def generate(self, prompts) -> list[list[str]]:
         beam_serach = False
 
@@ -158,6 +171,12 @@ class AsyncCausalLLM(CausalLLM):
         self.n = self.sampling_params.pop("n", 1)
         self.model = server_cfg.get("model")
         self.tokenize_args = dict(config.get("tokenize_args", {})) # dummy
+
+    def get_tokenize_args(self) -> dict:
+        return self.tokenize_args
+
+    def update_tokenize_args(self, new_args: dict) -> None:
+        self.tokenize_args.update(new_args)
 
     def merge_data_args(self, new_args: dict) -> None:
         # Sometimes, we need to use args about dataset.

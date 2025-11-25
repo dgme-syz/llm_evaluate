@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Sequence, Union
 
+import gc
+import torch
 
 class Metric(ABC):
     """Abstract base class for evaluation metrics."""

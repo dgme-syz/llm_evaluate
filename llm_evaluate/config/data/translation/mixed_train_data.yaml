@@ -10,3 +10,5 @@ generate_args:
 dataset_args:
   src_key: en
   tgt_key: zh
+data_tag: "mixed-wmt17-20"
+save: true

@@ -1,5 +1,5 @@
 name: dummy
-data_path: "/home/nfs05/shenyz/llm_evaluate/outputs/mt_trained/en-zh_CN_challenge_set_Qwen3-4B_base_no_args.jsonl"
+data_path: "/home/nfs05/shenyz/llm_evaluate/outputs/trained/Qwen3-4B/challenge_set_en-zh_CN_base_no_args.jsonl"
 subset_name: null
 split: train
 num_samples: null

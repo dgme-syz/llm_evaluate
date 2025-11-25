@@ -51,11 +51,11 @@ class wmt24(EvalDataset):
             dict: Structured item with prompt, ability, reward model, and extra info.
         """
         src_text = examples[self.src_key_name]
-        tgt_text = examples[self.tgt_key_name]
+        tgt_text = examples[self.tgt_key_name] if self.tgt_key_name else None
         prompt = self.template_func(self.src_lang, self.tgt_lang, src_text)
         
         return {
-            "data_source": "wmt24",
+            "data_source": examples.get("dataset_id", "wmt24"),
             "prompt": prompt,
             "ability": "translation",
             "reward_model": {

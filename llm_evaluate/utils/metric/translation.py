@@ -1,10 +1,9 @@
 import re
-import json
-import subprocess
-import tempfile
-from pathlib import Path
+import gc
 
 import sacrebleu
+import torch
+
 from llm_evaluate.utils.metric.registry import register
 from llm_evaluate.utils.metric.abstract import Metric
 
@@ -57,6 +56,67 @@ class BLEU(Metric):
         )
         return {"score": result.score}
 
+@register("sentenceBLEU")
+class sentenceBLEU(Metric):
+    """Sentence-level BLEU metric."""
+
+    def __call__(self, responses, references, extra_infos=None) -> float:
+        responses = [preprocess(x) for x in responses]
+        assert len(responses) == len(references), (
+            "The number of translations should be equal to the number of references"
+        )
+        scores = []
+        tgt_lang = "en"
+        if extra_infos and len(extra_infos) > 0:
+            tgt_lang = extra_infos[0].get("tgt_lang", "en")
+            print(f"Detected target language: {tgt_lang}")
+
+        # Choose tokenizer based on target language
+        if tgt_lang == "zh":
+            tokenizer = "zh"
+        elif tgt_lang == "ja":
+            tokenizer = "ja-mecab"
+        elif tgt_lang == "ko":
+            tokenizer = "ko-mecab"
+        else:
+            tokenizer = "13a"
+        
+        for resp, ref in zip(responses, references):
+            result = sacrebleu.sentence_bleu(
+                resp,
+                [ref],
+                tokenize=tokenizer,
+            )
+            scores.append(result.score)
+        average_score = sum(scores) / len(scores)
+        return {"score": average_score, "extra_dict": {"score_per_example": scores}}
+
+@register("BLEURT")
+class BLEURT(Metric):
+    """BLEURT metric."""
+
+    def __init__(self, model_path: str = "/home/nfs05/shenyz/bleurt/bleurt/BLEURT-20") -> None:
+        try:
+            from bleurt import score
+        except ImportError:
+            raise ImportError("Please install BLEURT: pip install bleurt")
+        self.scorer = score.BleurtScorer(model_path)
+
+    def __call__(self, responses, references, extra_infos=None) -> float:
+        responses = [preprocess(x) for x in responses]
+        assert len(responses) == len(references), (
+            "The number of translations should be equal to the number of references"
+        )
+        scores = self.scorer.score(references=references, candidates=responses)
+        average_score = sum(scores) / len(scores)
+        return {"score": average_score, "extra_dict": {"score_per_example": scores}}
+
+    def __del__(self):
+        del self.scorer
+        
+        gc.collect()
+        torch.cuda.empty_cache()
+
 
 @register("spBLEU")
 class spBLEU(Metric):
@@ -74,7 +134,7 @@ class spBLEU(Metric):
         )
         return {"score": result.score}
 
-import torch
+
 
 from comet import download_model, load_from_checkpoint
 from comet.models.utils import Prediction

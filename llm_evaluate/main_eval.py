@@ -3,12 +3,15 @@ import re
 import json
 from typing import Any
 from typing import List
+import gc
 
+import ray
 import torch
 import hydra
 import numpy as np
 from hydra import compose
 from tqdm import tqdm
+from ray.util.placement_group import placement_group, get_placement_group
 from omegaconf import DictConfig, OmegaConf, ListConfig
 
 from llm_evaluate.dataset import get_dataset
@@ -16,6 +19,10 @@ from llm_evaluate.vllm.utils import build_model
 from llm_evaluate.utils.metric import get_metrics
 from llm_evaluate.utils.eval_func import get_eval
 from llm_evaluate.utils.merge_wrapper import decorator
+from llm_evaluate.worker import (
+    Worker,
+    ClassWithInitArgs,
+)
 
 def safe_filename(s: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9._-]", "_", s)
@@ -48,7 +55,7 @@ def resolve_data_list_with_hydra(data_list: List[str]) -> List[DictConfig]:
 def compute_metrics_save_results(
     data_cfg: DictConfig,
     data: Any,
-    metric_funcs: dict[str, Any],
+    metric_cls: dict[str, Any],
     eval_cfg: DictConfig,
     cfg: DictConfig, 
 ):
@@ -57,6 +64,16 @@ def compute_metrics_save_results(
     # in newer version's Datasets, Dataset use list
     # So we use list() to ensure it can work in a lower version
     responses: list[list[str]] = list(data["response"])
+    if eval_cfg.get("metrics_args", {}).get("ignore_columns", []):
+        ignore_cols = eval_cfg.metrics_args.ignore_columns
+        rets = []
+        for resp in responses:
+            temp = []
+            for i, col in enumerate(resp):
+                if i not in ignore_cols:
+                    temp.append(col)
+            rets.append(temp)
+        responses = rets
     extras = list(data["extra_info"])
 
     # 9. Compute metrics
@@ -68,10 +85,19 @@ def compute_metrics_save_results(
     )
     print(OmegaConf.to_yaml(data_cfg))
     print("Computing metrics...")
-    for name, func in metric_funcs.items():
+    for name, cls in metric_cls.items():
+        print(f"Evaluating metric: {name} ...")
+        func = Worker(ClassWithInitArgs(cls))
+        func.init_worker()
+        # func = cls()
+
         scores: dict[str, Any] = {}
         decorated_func = decorator(func, merge_strategy=merge_strategy)
         sub_score = decorated_func(responses, answers, extras)
+        func.kill_worker()
+        # del func, decorated_func
+        # gc.collect()
+        # torch.cuda.empty_cache()
 
         # Ensure sub_score is valid
         if not isinstance(sub_score, dict) or "score" not in sub_score:
@@ -101,6 +127,7 @@ def compute_metrics_save_results(
             scores[f"{name}_score"] = score_value
 
         print(scores)
+
     torch.cuda.empty_cache()
 
     print("Evaluation finished.")
@@ -113,21 +140,23 @@ def compute_metrics_save_results(
         if cfg.get("use_server", False):
             model_name = cfg.server.model
         else:
-            model_name = cfg.llm.vllm.model.split("/")[-1] 
+            model_name = cfg.llm.get("exp_tag", "default_model")
         if "eval_func_args" in eval_cfg:
             eval_args = OmegaConf.to_container(eval_cfg.get("eval_func_args"), resolve=True)
             eval_args_str = json.dumps(eval_args, ensure_ascii=False, separators=(",", ":"))
         else:
             eval_args_str = "no_args"
         filename = (
-            f"{data_cfg.get('data_tag', '')}_"
-            f"{data_cfg.subset_name}_{data_cfg.name}_"
-            f"{model_name}_"
+            f"{data_cfg.get('data_tag', 'default')}_"
+            f"{data_cfg.subset_name}_"
             f"{eval_cfg.get('eval_func')}_"
             f"{eval_args_str}.jsonl"
         )
         filename = safe_filename(filename)
-        out_path = os.path.join(out_dir, filename)
+        out_path = os.path.join(out_dir, model_name, filename)
+
+        if not os.path.exists(os.path.dirname(out_path)):
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
         with open(out_path, "w", encoding="utf-8") as f:
             for item in tqdm(data, desc="Saving outputs"):
@@ -136,15 +165,24 @@ def compute_metrics_save_results(
 
         print(f"Saved outputs to: {out_path}")
 
-
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main_evaluate(cfg: DictConfig) -> None:
     """Main entry point for model evaluation using multiple datasets and metrics."""
-    
+
+    if not ray.is_initialized():
+        ray.init(ignore_reinit_error=True)
+
     print(f"Loaded config:\n{OmegaConf.to_yaml(cfg)}")
 
-    # 1. Initialize model
-    llm = build_model(cfg)
+    # 0. we need some processes to keep alive for ray
+    # dummy_cluster = DummyRayCluster(size_in_gb=1)
+    # dummy_cluster.start()
+
+    # 1. Build cls_dict: llm + metric functions
+    llm = Worker(ClassWithInitArgs(build_model, cfg))
+    llm.init_worker()
+    # print(dict(llm.get_tokenize_args()))
+    # llm = build_model(cfg)
     print("Model initialized.")
 
     # 2. Prepare evaluation configuration and metrics
@@ -222,21 +260,28 @@ def main_evaluate(cfg: DictConfig) -> None:
         )
         if cfg.get("use_server", False):
             llm.update_sampling_params(backup_args)
-        
-    if not cfg.get("use_server", False):
-        llm.llm.sleep(level=2)
-    metric_funcs = get_metrics(eval_cfg.get("metrics", []))
-    print(f"Loaded metrics: {list(metric_funcs.keys())}")
 
+    print("All datasets processed. Starting killing LLM...")
+    llm.kill_worker()
+    # if cfg.get("use_server", False):
+    #     llm.llm.sleep(1)
+    # llm.kill()
+    # del llm
+    print("LLM killed. Starting computing metrics...")
+
+    metric_cls = {}
+    for metric_name in cfg.evaluate.get("metrics", []):
+        metric_cls[metric_name] = get_metrics([metric_name], instantiate=False)[metric_name]
+
+    print(f"Loaded metrics: {list(metric_cls.keys())}")
     for data_cfg, data, eval_cfg, cfg in middle_states:
         compute_metrics_save_results(
             data_cfg,
             data,
-            metric_funcs,
+            metric_cls,
             eval_cfg,
             cfg
         )
-
 
 
 
