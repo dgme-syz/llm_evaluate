@@ -10,3 +10,4 @@ generate_args:
 dataset_args:
   src_key: src_text
   tgt_key: 参考译文
+data_tag: "challenge_set"

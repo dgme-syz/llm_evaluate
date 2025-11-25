@@ -50,7 +50,7 @@ class train_mixed_dataset(EvalDataset):
         prompt = self.template_func(self.src_lang, self.tgt_lang, src_text)
         
         return {
-            "data_source": "challenge_set",
+            "data_source": "wmt17-20",
             "prompt": prompt,
             "ability": "translation",
             "reward_model": {
