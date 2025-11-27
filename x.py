@@ -1,10 +1,30 @@
-from bleurt import score
+import json
 
-checkpoint = "/home/nfs05/shenyz/bleurt/bleurt/BLEURT-20"
-references = ["This is a test.", "整个20世纪60年代，布雷兹尼克为约翰·F·肯尼迪工作，担任他的顾问，之后又在林登·B·约翰逊政府中任职。"]
-candidates = ["This is the test.", "20 世纪 60 年代，布热津斯基先是为约翰·福特·肯尼迪效力，担任他的顾问，后来又为林登·贝恩斯·约翰逊政府工作。"]
+jsonl_path = "outputs/trained/Qwen3-4B-trained-mixed/flores_flores_en_flores_zh_recheck_check_num_1_use_thinking_true_use_thinking_prompts_false_.jsonl"
+hyp_path = "hyp.txt"
+ref_path = "ref.txt"
 
-scorer = score.BleurtScorer(checkpoint)
-scores = scorer.score(references=references, candidates=candidates)
-# assert isinstance(scores, list) and len(scores) == 1
-print(scores)
+with open(jsonl_path, "r", encoding="utf-8") as f_jsonl, \
+     open(hyp_path, "w", encoding="utf-8") as f_hyp, \
+     open(ref_path, "w", encoding="utf-8") as f_ref:
+    
+    for line in f_jsonl:
+        if not line.strip():
+            continue
+        data = json.loads(line)
+        
+        # 提取 response 的第二条翻译作为 hyp
+        response_list = data.get("response", [])
+        if not isinstance(response_list, list):
+            response_list = [response_list]
+        hyp = response_list[-1].replace("\n", " ").strip()
+        
+        # 提取 ground_truth 作为 ref
+        ref = data.get("reward_model", {}).get("ground_truth", "").replace("\n", " ").strip()
+        if not ref:
+            continue
+        
+        f_hyp.write(hyp + "\n")
+        f_ref.write(ref + "\n")
+
+print(f"Hypotheses written to {hyp_path}, references written to {ref_path}")
