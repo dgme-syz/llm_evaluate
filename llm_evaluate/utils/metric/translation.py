@@ -47,7 +47,9 @@ class BLEU(Metric):
             tokenizer = "ko-mecab"
         else:
             tokenizer = "13a"
-
+        print(
+            f"Preview of responses and references:\nResponse: {responses[0]}\nReference: {references[0]}"
+        )
         result = sacrebleu.corpus_bleu(
             responses,
             [references],

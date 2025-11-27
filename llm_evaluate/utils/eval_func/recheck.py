@@ -22,14 +22,11 @@ def recheck_prompt(target_lang: str, src_text: str, pred_text: str, thinking: bo
 
         if not thinking:
             user_input += (
-                f"10. 可以有思考过程，但是最终回复中仅输出你润色后的内容\n\n"
+                f"10. 可以有思考过程，不要无限思考下去，最终回复中仅输出你润色后的内容\n\n"
                 f"请返回你最后的润色翻译文本，不要输出多余内容。"
             )
         else:
-            user_input += (
-                f"10. 可以有思考过程，然后输出你润色后的内容\n\n"
-                f"请将你最后的润色翻译文本放置在 <text> 和 </text> 之间，请不要输出多余内容。"
-            )
+            raise ValueError("Deprecated: thinking mode for Chinese recheck is just used.")
     elif "en" in target_lang:
         user_input = (
             f"Given the source text: '{src_text}' and its draft translation: '{pred_text}', "

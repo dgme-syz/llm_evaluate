@@ -23,7 +23,7 @@ evaluate:
     - cometkiwi
     - BLEURT
   metrics_args:
-    ignore_columns: []
+    ignore_columns: [0]
   eval_func: recheck
   eval_func_args:
     check_num: 1
@@ -57,7 +57,7 @@ generate_params:
   offline:
     use_beam_search: false
     sampling_params:
-      max_tokens: 4096
+      max_tokens: 8196
       # top_k: 20
       # top_p: 0.95
       temperature: 0.6
