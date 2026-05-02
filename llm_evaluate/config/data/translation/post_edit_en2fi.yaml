@@ -1,0 +1,3 @@
+from_saved: "/home/nfs06/shenyz/data/recheck/train/wmt_en2fi_7k.parquet"
+subset_name: "null"
+name: "train_en2fi"

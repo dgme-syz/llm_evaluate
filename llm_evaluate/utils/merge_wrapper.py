@@ -12,6 +12,10 @@ def decorator(obj: Metric, merge_strategy: Literal["avg", "pass", "total"] = "pa
             paths, all_responses = zip(*flatten_with_paths(responses))
             all_answers = [ans for ans, resps in zip(answers, responses) for _ in resps]
             all_extra_infos = [info for info, resps in zip(extra_infos, responses) for _ in resps]
+            print(
+                f"all_responses: {all_responses[:min(10, len(all_responses))]}\n\n"
+                f"all_answers: {all_answers[:min(10, len(all_answers))]}\n\n"
+            )
             res = obj(all_responses, all_answers, all_extra_infos)
 
             if "score" not in res:

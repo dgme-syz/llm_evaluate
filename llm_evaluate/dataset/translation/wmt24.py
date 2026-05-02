@@ -2,6 +2,7 @@ from llm_evaluate.dataset import EvalDataset, register
 from llm_evaluate.dataset.translation import (
     get_prompt_template,
     LANGUAGE_BY_CODE,
+    LANG_DICT
 )
 
 
@@ -29,8 +30,10 @@ class wmt24(EvalDataset):
 
         # Extract source and target languages from subset_name
         src_code, tgt_code = subset_name.strip().split("-")
-        self.src_lang = LANGUAGE_BY_CODE.get(src_code, src_code)
-        self.tgt_lang = LANGUAGE_BY_CODE.get(tgt_code, tgt_code)
+        if extra_args and extra_args.get("reverse", False):
+            src_code, tgt_code = tgt_code, src_code
+        self.src_lang = LANGUAGE_BY_CODE.get(src_code, LANG_DICT.get(src_code, src_code))
+        self.tgt_lang = LANGUAGE_BY_CODE.get(tgt_code, LANG_DICT.get(tgt_code, tgt_code))
         self.src_code = src_code
         self.tgt_code = tgt_code.split("_")[0]
         self.extra_args = extra_args or {}
@@ -55,7 +58,7 @@ class wmt24(EvalDataset):
         prompt = self.template_func(self.src_lang, self.tgt_lang, src_text)
         
         return {
-            "data_source": examples.get("dataset_id", "wmt24"),
+            "data_source": examples.get("dataset_id", self.extra_args.get("data_tag", "wmt24")),
             "prompt": prompt,
             "ability": "translation",
             "reward_model": {

@@ -10,6 +10,7 @@ import torch
 import hydra
 import numpy as np
 from hydra import compose
+from datasets import load_dataset
 from tqdm import tqdm
 from ray.util.placement_group import placement_group, get_placement_group
 from omegaconf import DictConfig, OmegaConf, ListConfig
@@ -28,6 +29,70 @@ def safe_filename(s: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9._-]", "_", s)
     s = re.sub(r"_+", "_", s)
     return s.strip("_")
+
+def save_outputs(
+    data,
+    cfg,
+    data_cfg,
+    eval_cfg,
+):
+    """
+    Save evaluation outputs to a jsonl file according to config settings.
+
+    Parameters
+    ----------
+    data : Iterable[dict]
+        Iterable of output items to be saved (one item per line).
+    cfg : OmegaConf / dict-like
+        Global config, controls saving behavior and model naming.
+    data_cfg : OmegaConf / dict-like
+        Dataset config, provides data_tag and subset_name.
+    eval_cfg : OmegaConf / dict-like
+        Evaluation config, provides eval_func and optional eval_func_args.
+    """
+    if not cfg.get("save_outputs", False):
+        return
+    
+    # -------- output directory --------
+    out_dir = cfg.get("outputs_dir", "./output")
+    os.makedirs(out_dir, exist_ok=True)
+
+    # -------- model name --------
+    if cfg.get("use_server", False):
+        model_name = cfg.server.model
+    else:
+        model_name = cfg.llm.get("exp_tag", "default_model")
+
+    # -------- eval args --------
+    if "eval_func_args" in eval_cfg:
+        eval_args = OmegaConf.to_container(
+            eval_cfg.get("eval_func_args"), resolve=True
+        )
+        eval_args_str = json.dumps(
+            eval_args, ensure_ascii=False, separators=(",", ":")
+        )
+    else:
+        eval_args_str = "no_args"
+
+    # -------- filename --------
+    filename = (
+        f"{data_cfg.get('data_tag', 'default')}_"
+        f"{data_cfg.subset_name}_"
+        f"{eval_cfg.get('eval_func')}_"
+        f"{eval_args_str}.jsonl"
+    )
+    filename = safe_filename(filename)
+
+    out_path = os.path.join(out_dir, model_name, filename)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+    # -------- save --------
+    with open(out_path, "w", encoding="utf-8") as f:
+        for item in tqdm(data, desc="Saving outputs"):
+            json.dump(item, f, ensure_ascii=False)
+            f.write("\n")
+
+    print(f"Saved outputs to: {out_path}")
 
 def resolve_data_list_with_hydra(data_list: List[str]) -> List[DictConfig]:
     """
@@ -133,37 +198,7 @@ def compute_metrics_save_results(
     print("Evaluation finished.")
 
     # 10. Save evaluation outputs
-    if cfg.get("save_outputs", False):
-        out_dir = cfg.get("outputs_dir", "./output")
-        os.makedirs(out_dir, exist_ok=True)
-
-        if cfg.get("use_server", False):
-            model_name = cfg.server.model
-        else:
-            model_name = cfg.llm.get("exp_tag", "default_model")
-        if "eval_func_args" in eval_cfg:
-            eval_args = OmegaConf.to_container(eval_cfg.get("eval_func_args"), resolve=True)
-            eval_args_str = json.dumps(eval_args, ensure_ascii=False, separators=(",", ":"))
-        else:
-            eval_args_str = "no_args"
-        filename = (
-            f"{data_cfg.get('data_tag', 'default')}_"
-            f"{data_cfg.subset_name}_"
-            f"{eval_cfg.get('eval_func')}_"
-            f"{eval_args_str}.jsonl"
-        )
-        filename = safe_filename(filename)
-        out_path = os.path.join(out_dir, model_name, filename)
-
-        if not os.path.exists(os.path.dirname(out_path)):
-            os.makedirs(os.path.dirname(out_path), exist_ok=True)
-
-        with open(out_path, "w", encoding="utf-8") as f:
-            for item in tqdm(data, desc="Saving outputs"):
-                json.dump(item, f, ensure_ascii=False)
-                f.write("\n")
-
-        print(f"Saved outputs to: {out_path}")
+    save_outputs(data, cfg, data_cfg, eval_cfg)
 
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main_evaluate(cfg: DictConfig) -> None:
@@ -201,47 +236,50 @@ def main_evaluate(cfg: DictConfig) -> None:
     middle_states = []
     for i, data_cfg in enumerate(cfg_data):
         subset_name = getattr(data_cfg, "subset_name", None)
-        if cfg.get("use_server", False):
-            backup_args = llm.sampling_params.copy()
-            if "generate_args" in data_cfg:
-                llm.merge_data_args(data_cfg["generate_args"])
-    
-        print(f"Evaluating dataset: {data_cfg.name}-{subset_name}")
+        print(data_cfg)
+        if (parquet_file := data_cfg.get("from_saved", None)) is None:
+            if cfg.get("use_server", False):
+                backup_args = llm.get_sampling_params().copy()
+                if "generate_args" in data_cfg:
+                    llm.merge_data_args(data_cfg["generate_args"])
+        
+            print(f"Evaluating dataset: {data_cfg.name}-{subset_name}")
 
-        dataset_cls = get_dataset(data_cfg.name)
-        if cfg.get("use_server", False):
-            model_name = cfg.server.model
-            prompt_type = cfg.server.get("prompt_template", None)
+            dataset_cls = get_dataset(data_cfg.name)
+            if cfg.get("use_server", False):
+                model_name = cfg.server.model
+                prompt_type = cfg.server.get("prompt_template", None)
+            else:
+                model_name = cfg.llm.vllm.model.split("/")[-1] 
+                prompt_type = cfg.llm.get("prompt_template", None)
+            dataset = dataset_cls(
+                data_dir=data_cfg.data_path,
+                subset_name=subset_name,
+                split=getattr(data_cfg, "split", "test"),
+                builder=getattr(data_cfg, "builder", None),
+                extra_args={
+                    "model": model_name,
+                    "prompt_template": prompt_type,
+                    **data_cfg.get("dataset_args", {}),
+                }
+            )
+
+
+            # 5. Preprocess dataset
+            data = dataset.map(
+                batched=False,
+                save_columns=getattr(data_cfg, "save_columns", False)
+            )
+            if data_cfg.get("save", False):
+                data.to_parquet(os.path.join("temp", f"{data_cfg.name}_{subset_name}.parquet"))
+                print(f"Saved processed dataset to temp/{data_cfg.name}_{subset_name}.parquet")
+
+            # 6. Subsample for debugging if requested
+            if (num_samples := getattr(data_cfg, "num_samples", None)):
+                data = data.select(range(num_samples))
+                print(f"[Dev] Using num_samples={num_samples} for debugging.")
         else:
-            model_name = cfg.llm.vllm.model.split("/")[-1] 
-            prompt_type = cfg.llm.get("prompt_template", None)
-        dataset = dataset_cls(
-            data_dir=data_cfg.data_path,
-            subset_name=subset_name,
-            split=getattr(data_cfg, "split", "test"),
-            builder=getattr(data_cfg, "builder", None),
-            extra_args={
-                "model": model_name,
-                "prompt_template": prompt_type,
-                **data_cfg.get("dataset_args", {}),
-            }
-        )
-
-
-        # 5. Preprocess dataset
-        data = dataset.map(
-            batched=False,
-            save_columns=getattr(data_cfg, "save_columns", False)
-        )
-        if data_cfg.get("save", False):
-            data.to_parquet(os.path.join("temp", f"{data_cfg.name}_{subset_name}.parquet"))
-            print(f"Saved processed dataset to temp/{data_cfg.name}_{subset_name}.parquet")
-
-        # 6. Subsample for debugging if requested
-        if (num_samples := getattr(data_cfg, "num_samples", None)):
-            data = data.select(range(num_samples))
-            print(f"[Dev] Using num_samples={num_samples} for debugging.")
-
+            data = load_dataset("parquet", data_files=parquet_file, split="train")
         # 7. Prepare evaluation function
         batch_size = eval_cfg.get("val_size", 1)
         
@@ -274,6 +312,10 @@ def main_evaluate(cfg: DictConfig) -> None:
         metric_cls[metric_name] = get_metrics([metric_name], instantiate=False)[metric_name]
 
     print(f"Loaded metrics: {list(metric_cls.keys())}")
+    # temp save
+    for data_cfg, data, eval_cfg, cfg in middle_states:
+        save_outputs(data, cfg, data_cfg, eval_cfg)
+    # gpu needed
     for data_cfg, data, eval_cfg, cfg in middle_states:
         compute_metrics_save_results(
             data_cfg,

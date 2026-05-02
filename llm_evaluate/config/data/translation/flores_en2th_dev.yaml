@@ -1,0 +1,12 @@
+name: flores
+data_path:
+  - DGME/FLORES-200
+  - DGME/FLORES-200
+subset_name:
+  - flores_en
+  - flores_th
+split:
+  - dev
+  - dev
+num_samples: null
+save: true

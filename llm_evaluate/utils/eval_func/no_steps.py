@@ -4,7 +4,7 @@ from .abstract import EvalFunc
 @register("no_steps")
 class NoStepsEvalFunc(EvalFunc):
 
-    def __init__(self, llm):
+    def __init__(self, llm, **kwargs):
         super().__init__(llm)
 
     def evaluate(self, examples):

@@ -4,6 +4,7 @@ from typing import Any
 import subprocess
 
 import ray
+import gc
 
 
 class ClassWithInitArgs:
@@ -54,3 +55,4 @@ class Worker:
     
     def kill_worker(self):
         ray.kill(self.actor)
+        gc.collect()

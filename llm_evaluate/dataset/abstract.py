@@ -183,7 +183,7 @@ class EvalDataset(ABC):
         num_proc: int | None = None,
         batched: bool = False,
         batch_size: int | None = None,
-        num_examines: int = 1,
+        num_examines: int = 2,
         save_columns: bool = False,
     ) -> Dataset:
         """Apply conversion to the entire dataset"""

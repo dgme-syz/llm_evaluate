@@ -196,8 +196,25 @@ ppo_lang_dict = {
     "Ukrainian": "uk",
     "Vietnamese": "vi",
     "Chinese (Simplified)": "zh",
+    "Chinese": "zh",
 }
 
+
+def tower_chat_input(src_lang_name, tgt_lang_name, src_text):
+    user_input = (
+        f"Translate the following text from {src_lang_name} into {tgt_lang_name}.\n"
+        f"{src_lang_name}: {src_text}.\n{tgt_lang_name}:"
+    )
+
+    return [{"role": "user", "content": user_input}]
+
+def tower_plus_input(src_lang_name, tgt_lang_name, src_text):
+    user_input = (
+        f"Translate the following {src_lang_name} source text to {tgt_lang_name}:\n"
+        f"{src_lang_name}: {src_text}\n{tgt_lang_name}: "
+    )
+
+    return [{"role": "user", "content": user_input}]
 
 
 def qwen_chat_input(src_lang_name, tgt_lang_name, src_text):
@@ -260,6 +277,28 @@ def seed_x_ppo_input(src_lang_name, tgt_lang_name, src_text):
     )
     return user_input
 
+def ssr_chat_input(src_lang_name, tgt_lang_name, src_text):
+    # see https://huggingface.co/wjyccs/SSR-X-Zero-7B
+    if tgt_lang_name not in ("English", "Chinese"):
+        raise ValueError(f"Unsupported target language {tgt_lang_name} for SSR-X input. Now we just support English and Chinese.")
+    system_prompt = """<|startoftext|>A conversation between User and Assistant. The User asks a question, and the Assistant solves it. \
+The Assistant first thinks about the reasoning process in the mind and then provides the User with the answer. \
+The reasoning process is enclosed within <think> </think> and answer is enclosed within <answer> </answer> tags, respectively, \
+i.e., <think> reasoning process here </think> <answer> answer here </answer>. \
+
+User:
+{}
+
+Assistant:
+"""
+    instruction = "Translate the following text to {}: \n{}"
+    prompt = system_prompt.format(
+        instruction.format(tgt_lang_name, src_text)
+    )
+    return [{"role": "user", "content": prompt}]
+
+
+
 
 PROMPT_TEMPLATE = OrderedDict[str, Callable](
     [
@@ -267,7 +306,10 @@ PROMPT_TEMPLATE = OrderedDict[str, Callable](
         ("qwen_think_mt", qwen_think_input),
         ("qwen_mt_turbo", qwen_mt_input),
         ("hunyuan_mt_chat", hunyuan_chat_input),
-        ("seed_x_mt", seed_x_ppo_input)
+        ("seed_x_mt", seed_x_ppo_input),
+        ("ssr_x_mt", ssr_chat_input),
+        ("tower_chat_input", tower_chat_input),
+        ("tower_plus_input", tower_plus_input),
     ]
 )
 

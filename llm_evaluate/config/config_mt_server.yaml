@@ -1,25 +1,36 @@
 data:
-  - data/translation/wmt24_data_sample
-  #  - data/translation/flores_data_sample
-  - data/translation/challenge_set_data_sample
+  # - data/translation/mixed_train_data
+  # - data/translation/wmt25_en2zh
   # - data/translation/wmt24_en2zh
+  # - data/translation/challenge_set_en2zh
+  # - data/translation/flores_en2zh
+  # - data/translation/wmt24_en2fi
+  # - data/translation/flores_en2fi
+  - data/translation/wmt24_en2tr
+  # - data/translation/flores_en2tr
+  # - data/translation/flores_data_sample
+  # - data/translation/wmt24_data_sample
+  # - data/translation/challenge_set_data_sample
+  # - data/translation/challenge_set_zh2en
   # - data/translation/wmt24_en2id
   # - data/translation/flores_en2ja
   # - data/translation/flores_zh2ja
-  # - data/translation/flores_en2zh
   # - data/translation/flores_zh2hr
+  # - data/translation/data_sample
 
 evaluate:
   val_size: 256
   num_proc: null
   metrics:
-    - BLEU
-    # - cometkiwi
-  eval_func: recheck
-  eval_func_args:
-    check_num: 1
-    use_thinking: true
-    use_thinking_prompts: false
+    # - sentenceBLEU
+    # - BLEU
+    - chrFpp
+    # - spBLEU
+    # - comet-22
+    - cometkiwi
+    # - BLEURT
+    - xcomet-xl
+  eval_func: base
   merge_strategy: total
 
 use_server: true
@@ -34,7 +45,7 @@ server:
 
 generate_params:
   online: 
-    max_tokens: 4096
+    max_tokens: 256
     
 save_outputs: true # save format: jsonl
 outputs_dir: ./outputs/sft/

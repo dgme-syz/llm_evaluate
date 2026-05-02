@@ -1,0 +1,8 @@
+name: wmt24
+data_path: wmt24/
+subset_name: en-tr_TR
+split: train
+num_samples: null
+dataset_args:
+  src_key: source
+  tgt_key: target

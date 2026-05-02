@@ -1,12 +1,8 @@
 name: wmt24
 data_path: /home/nfs06/shenyz/data/wmt24
-subset_name: en-id_ID
+subset_name: en-cs_CZ
 split: train
 num_samples: null
-generate_args:
-  translation_options:
-    source_lang: auto
-    target_lang: Indonesian
 dataset_args:
   src_key: source
   tgt_key: target

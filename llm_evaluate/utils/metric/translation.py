@@ -19,6 +19,8 @@ def preprocess(text: str) -> str:
         extracted = match.group(1)
     else:
         extracted = text_after_think  
+        if extracted.strip().startswith("<think>"):
+            extracted = "null"
 
     return extracted.strip()
 
@@ -130,13 +132,31 @@ class spBLEU(Metric):
         )
         result = sacrebleu.corpus_bleu(
             responses,
-            [[x] for x in references],
+            [references],
             tokenize="flores200",
             force=True,
         )
         return {"score": result.score}
 
+@register("chrFpp")
+class chrFpp(Metric):
+    """chrF++ metric using sacrebleu.corpus_chrf."""
 
+    def __call__(self, responses, references, extra_infos=None) -> float:
+        assert len(responses) == len(references), (
+            "The number of translations should be equal to the number of references"
+        )
+
+        # sacrebleu expects list of system outputs, and list of list of references
+        result = sacrebleu.corpus_chrf(
+            responses,
+            [references],
+            # chrF++ means char- + word-ngrams, equivalent to default word_order=2
+            word_order=2,   # chrF++ (chrF if word_order=0)
+            beta=2,         # default, balances recall (2× recall weight)
+        )
+
+        return {"score": result.score}
 
 from comet import download_model, load_from_checkpoint
 from comet.models.utils import Prediction
@@ -155,7 +175,10 @@ def build_Comet_cls(model_name: str):
 
         def __call__(self, responses, references, extra_infos=None) -> dict:
             if self.model is None:
-                model_path = download_model(self.model_name)
+                try:
+                    model_path = download_model(self.model_name)
+                except Exception:
+                    model_path = self.model_name
                 self.model = load_from_checkpoint(model_path)
 
             responses = [preprocess(x) for x in responses]
@@ -168,7 +191,7 @@ def build_Comet_cls(model_name: str):
             data = [{"src": src, "mt": hyp, "ref": ref} 
                     for src, hyp, ref in zip(sources, responses, references)]
 
-            preds = self.model.predict(data, batch_size=self.bsz, gpus=1) # gpus must be 1
+            preds = self.model.predict(data, batch_size=self.bsz, gpus=1, num_workers=0) # gpus must be 1
             outputs: dict = {"extra_dict": {}}
             if hasattr(preds, "system_score"):
                 outputs["score"] = float(preds.system_score)
@@ -183,7 +206,7 @@ def build_Comet_cls(model_name: str):
     return DynamicComet
 
 for cls_name, model_name in [
-    ("xcomet-xxl", "Unbabel/XCOMET-XXL"), 
+    ("xcomet-xl", "/home/nfs05/model/XCOMET-XL/checkpoints/model.ckpt"), 
     ("cometkiwi", "Unbabel/wmt23-cometkiwi-da-xl"),
     ("comet-22", "Unbabel/wmt22-comet-da")
 ]:

@@ -4,7 +4,7 @@ from .abstract import EvalFunc
 @register("base")
 class BaseEvalFunc(EvalFunc):
 
-    def __init__(self, llm):
+    def __init__(self, llm, **kwargs):
         super().__init__(llm)
 
     def evaluate(self, examples):

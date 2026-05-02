@@ -3,8 +3,8 @@ data_path:
   - /home/nfs06/shenyz/data/BenchMAX_General_Translation
   - /home/nfs06/shenyz/data/BenchMAX_General_Translation
 subset_name:
-  - flores_en
   - flores_zh
+  - flores_en
 split:
   - train
   - train
@@ -12,7 +12,7 @@ num_samples: null
 generate_args:
   translation_options:
     source_lang: auto
-    target_lang: Chinese
+    target_lang: English
 dataset_args:
   src_key: source
   tgt_key: target

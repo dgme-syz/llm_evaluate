@@ -1,0 +1,17 @@
+data: 
+  x: /home/nfs05/shenyz/llm_evaluate/outputs/test/x.jsonl
+  y: /home/nfs05/shenyz/llm_evaluate/outputs/test/y.jsonl
+
+server: 
+  model: qwen-mt-turbo
+  ignore_proxy: false
+  openai_args:
+    api_key: null
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+
+generate_params:
+  online: 
+    max_tokens: 1024
+    
+save_outputs: true # save format: jsonl
+outputs_dir: ./outputs/judge/

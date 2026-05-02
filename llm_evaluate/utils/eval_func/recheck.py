@@ -1,53 +1,185 @@
 import re
+import textwrap
 
 from .registry import register
 from .abstract import EvalFunc
 
-def recheck_prompt(target_lang: str, src_text: str, pred_text: str, thinking: bool = False):
+LANG_DICT = {
+    "en": "English", "zh": "Chinese (Simplified)", "hu": "Hungarian", "es": "Spanish", "fr": "French", "de": "German", "ru": "Russian", "ja": "Japanese", "th": "Thai", "sw": "Swahili", "bn": "Bengali", "te": "Telugu", "ar": "Arabic", "ko": "Korean", "vi": "Vietnamese", "cs": "Czech", "sr": "Cyrillic Serbian"
+}
 
-    if "zh" in target_lang:
-        user_input = (
-            f"给定源文：'{src_text}'，和它的翻译草稿：'{pred_text}'"
-            f"必须先理解源文，然后参考以下标准对草稿进行进一步修改润色\n\n"
-            f"1. 草稿翻译可能漏翻，请不要遗漏原文的含义\n\n"
-            f"2. 保证翻译文段读起来流畅，通顺，符合人类表达，可以调整句子的顺序\n\n"
-            f"3. 请注意仔细理解语境，选择书面语还是口语化表达\n\n"
-            f"4. 请再检查每个词翻译的意思，是否符合整个语境和现实社会\n\n"
-            f"5. 请再检查每个句翻译的意思，是否符合整个语境和现实社会\n\n"
-            f"6. 注意你的润色对象是翻译后的草稿，不是源文\n\n"
-            f"7. 当你觉得语句读起来困惑的时候，尝试从源文本重新思考\n\n"
-            f"8. 如果翻译草稿的语言并非中文，请确保你的润色文本为中文\n\n"
-            f"9. 注意检查，不要遗漏源文的含义，也不要添加补充，也不要尝试在翻译中使用过分的比喻\n\n"
-        )
+LANG_DICT.update({
+    "ha": "Hausa",
+    "om": "Oromo",
+    "so": "Somali",
+    "am": "Amharic",
+    "he": "Hebrew",
+    "mt": "Maltese",
+    "km": "Khmer",
+    "jv": "Javanese",
+    "id": "Indonesian",
+    "ms": "Malay",
+    "mi": "Maori",
+    "ceb": "Cebuano",
+    "tl": "Tagalog",
+    "kn": "Kannada",
+    "ml": "Malayalam",
+    "ta": "Tamil",
+    "hy": "Armenian",
+    "lt": "Lithuanian",
+    "lv": "Latvian",
+    "be": "Belarusian",
+    "bg": "Bulgarian",
+    "bs": "Bosnian",
+    "hr": "Croatian",
+    "mk": "Macedonian",
+    "pl": "Polish",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "uk": "Ukrainian",
+    "cy": "Welsh",
+    "ga": "Irish",
+    "is": "Icelandic",
+    "sv": "Swedish",
+    "da": "Danish",
+    "no": "Norwegian",
+    "af": "Afrikaans",
+    "lb": "Luxembourgish",
+    "nl": "Dutch",
+    "el": "Greek",
+    "as": "Assamese",
+    "gu": "Gujarati",
+    "hi": "Hindi",
+    "mr": "Marathi",
+    "ne": "Nepali",
+    "or": "Odia",
+    "pa": "Punjabi",
+    "sd": "Sindhi",
+    "ur": "Urdu",
+    "fa": "Persian",
+    "ku": "Kurdish",
+    "ps": "Pashto",
+    "tg": "Tajik",
+    "ast": "Asturian",
+    "ca": "Catalan",
+    "gl": "Galician",
+    "it": "Italian",
+    "oc": "Occitan",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ka": "Georgian",
+    "lo": "Lao",
+    "mn": "Mongolian",
+    "wo": "Wolof",
+    "ln": "Lingala",
+    "ns": "Northern Sotho",
+    "lg": "Luganda",
+    "ny": "Nyanja",
+    "sn": "Shona",
+    "umb": "Umbundu",
+    "xh": "Xhosa",
+    "yo": "Yoruba",
+    "zu": "Zulu",
+    "ig": "Igbo",
+    "kam": "Kamba",
+    "ff": "Fulani",
+    "luo": "Dholuo",
+    "kea": "Kabuverdianu",
+    "zhtrad": "Traditional Chinese",
+    "my": "Burmese",
+    "uz": "Uzbek",
+    "kk": "Kazakh",
+    "ky": "Kyrgyz",
+    "az": "Azerbaijani",
+    "tr": "Turkish",
+    "et": "Estonian",
+    "fi": "Finnish",
+})
 
-        if not thinking:
-            user_input += (
-                f"10. 可以有思考过程，不要无限思考下去，最终回复中仅输出你润色后的内容\n\n"
-                f"请返回你最后的润色翻译文本，不要输出多余内容。"
-            )
-        else:
-            raise ValueError("Deprecated: thinking mode for Chinese recheck is just used.")
-    elif "en" in target_lang:
-        user_input = (
-            f"Given the source text: '{src_text}' and its draft translation: '{pred_text}', "
-            f"please refine and polish the draft translation according to the following guidelines:\n\n"
-            f"1. The draft translation may have omissions — do not leave out any meaning from the source text.\n\n"
-            f"2. Ensure the translation reads smoothly and naturally, consistent with human expression; you may adjust sentence order if needed.\n\n"
-            f"3. Carefully understand the context, and decide whether to use formal or colloquial language.\n\n"
-            f"4. Recheck the meaning of each word to ensure it fits the overall context and real-world usage.\n\n"
-            f"5. Recheck the meaning of each sentence to ensure it fits the overall context and real-world usage.\n\n"
-            f"6. Note that your task is to polish the translated draft, not the source text.\n\n"
-            f"7. When a sentence feels confusing, reconsider it from the perspective of the source text.\n\n"
-            f"8. If the draft translation is not in English, make sure your refined version is in English.\n\n"
-            f"9. Do not include any extra reasoning or commentary — only output your polished translation.\n\n"
-            f"Please return only the final refined translation text, without any additional content."
-        )
-    else:
-        raise ValueError(
-            f"Now we just support lang=['Chinese', 'English'], we get {target_lang}"
-        )
+def recheck_prompt(target_lang: str, src_text: str, pred_text: str, simple: bool = True):
+    """Builds the prompt for the recheck/refinement step."""
+    prompts = {
+        "zh": textwrap.dedent(
+            f"""
+            给定源文：'{src_text}'，和它的翻译草稿：'{pred_text}'
+            必须先理解源文，然后参考以下标准对草稿进行进一步修改润色
 
-    return [{"role": "user", "content": user_input}]
+            1. 草稿翻译可能漏翻，请不要遗漏原文的含义
+            2. 保证翻译文段读起来流畅，通顺，符合人类表达，可以调整句子的顺序
+            3. 请注意仔细理解语境，选择书面语还是口语化表达
+            4. 请再检查每个词翻译的意思，是否符合整个语境和现实社会
+            5. 请再检查每个句翻译的意思，是否符合整个语境和现实社会
+            6. 注意你的润色对象是翻译后的草稿，不是源文
+            7. 当你觉得语句读起来困惑的时候，尝试从源文本重新思考
+            8. 如果翻译草稿的语言并非中文，请确保你的润色文本为中文
+            9. 注意检查，不要遗漏源文的含义，也不要添加补充，也不要尝试在翻译中使用过分的比喻
+            10. 可以有思考过程，不要无限思考下去，最终回复中仅输出你润色后的内容
+
+            请返回你最后的润色翻译文本，不要输出多余内容。
+            """
+        ).strip(),
+        "en": textwrap.dedent(
+            f"""
+            Given the source text: '{src_text}' and its draft translation: '{pred_text}', please refine and polish the draft translation according to the following guidelines:
+
+            1. The draft translation may have omissions — do not leave out any meaning from the source text.
+            2. Ensure the translation reads smoothly and naturally, consistent with human expression; you may adjust sentence order if needed.
+            3. Carefully understand the context, and decide whether to use formal or colloquial language.
+            4. Recheck the meaning of each word to ensure it fits the overall context and real-world usage.
+            5. Recheck the meaning of each sentence to ensure it fits the overall context and real-world usage.
+            6. Note that your task is to polish the translated draft, not the source text.
+            7. When a sentence feels confusing, reconsider it from the perspective of the source text.
+            8. If the draft translation is not in English, make sure your refined version is in English.
+            9. Do not include any extra reasoning or commentary — only output your polished translation.
+
+            Please return only the final refined translation text, without any additional content.
+            """
+        ).strip(),
+        "fi": textwrap.dedent(
+            f"""
+            Kun sinulle annetaan lähdeteksti: '{src_text}' ja sen käännösluonnos: '{pred_text}',
+            sinun tulee ensin ymmärtää lähdeteksti ja sen jälkeen muokata ja viimeistellä luonnosta
+            seuraavien periaatteiden mukaisesti.
+
+            1. Käännösluonnoksessa saattaa olla puutteita; älä jätä pois mitään alkutekstin merkitystä.
+            2. Varmista, että käännetty teksti on sujuvaa, luonnollista ja ihmisen tapaista; voit tarvittaessa
+                muuttaa virkkeen sanajärjestystä.
+            3. Kiinnitä erityistä huomiota kontekstiin ja valitse tilanteeseen sopiva tyyli, olipa se sitten
+                kirjakielinen tai puhekielisempi.
+            4. Tarkista jokaisen sanan merkitys ja varmista, että se sopii sekä lauseyhteyteen että todelliseen maailmaan.
+            5. Tarkista jokaisen virkkeen merkitys ja varmista, että se vastaa koko kontekstia ja todellisuutta.
+            6. Muista, että viimeisteltävä kohde on käännösluonnos, ei alkuperäinen lähdeteksti.
+            7. Jos jokin kohta tuntuu epäselvältä, palaa lähdetekstiin ja mieti sitä uudelleen.
+            8. Jos käännösluonnos ei ole kiinaksi, varmista että viimeistelty tekstisi on kiinankielinen.
+            9. Huolehdi siitä, ettet jätä pois alkutekstin merkityksiä, älä lisää ylimääräistä sisältöä
+                äläkä käytä ylenpalttisia vertauksia käännöksessä.
+            10. Voit näyttää ajatteluprosessin, mutta älä jatka sitä loputtomiin; lopullisessa vastauksessa
+                tulee olla vain viimeistelemäsi teksti.
+
+            Palauta lopuksi vain viimeistelty käännöksesi, älä mitään ylimääräistä.
+            """
+        ).strip(),
+        "test": textwrap.dedent(
+            f"""
+            Given the source text: 
+            
+            {src_text}
+            
+            Improve the following draft {LANG_DICT.get(target_lang, target_lang)} translation into a high-quality {LANG_DICT.get(target_lang, target_lang)} version, without explanations:
+
+            {pred_text}
+            """
+        ).strip(),
+    }
+
+    lang_key = next((key for key in prompts if key in target_lang), None)
+    if lang_key is None:
+        raise ValueError(f"Unsupported target language: {target_lang}. Supported: {list(prompts.keys())}")
+
+    if simple:
+        lang_key = "test"
+
+    return [{"role": "user", "content": prompts[lang_key]}]
 
 
 def process_recheck_output(output: str, raw: str) -> str:
@@ -124,7 +256,7 @@ class ReCheckEvalFunc(EvalFunc):
 
         for _ in range(self.check_num):
             new_prompts = [
-                recheck_prompt(lang, src, preds[0], thinking=self.use_thinking_prompts)
+                recheck_prompt(lang, src, preds[0])
                 for src, preds in zip(src_list, current_pred_list)
             ]
             new_predictions = self.llm.generate(new_prompts)

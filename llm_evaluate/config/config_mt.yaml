@@ -1,14 +1,28 @@
 data:
   # - data/translation/mixed_train_data
   # - data/translation/wmt25_en2zh
-  - data/translation/wmt24_en2zh
-  - data/translation/challenge_set_en2zh
-  - data/translation/flores_en2zh
+  # - data/translation/wmt24_en2zh
+  # - data/translation/challenge_set_en2zh
+  # - data/translation/flores_en2zh
+  # - data/translation/wmt24_zh2en
+  # - data/translation/challenge_set_zh2en
+  # - data/translation/flores_zh2en
+  # - data/translation/wmt24_en2fi
+  # - data/translation/flores_en2fi
+  # - data/translation/flores_en2cs
+  # - data/translation/wmt24_en2cs
+  # - data/translation/wmt24_en2tr
+  # - data/translation/flores_en2tr
+  # - data/translation/flores_en2tr
+  # - data/translation/flores_en2id_dev
+  - data/translation/flores_en2th_dev
+  # - data/translation/flores_en2id
+  # - data/translation/wmt24_en2id
+  # - data/translation/post_edit_en2fi
   # - data/translation/flores_data_sample
   # - data/translation/wmt24_data_sample
   # - data/translation/challenge_set_data_sample
   # - data/translation/challenge_set_zh2en
-  # - data/translation/wmt24_en2id
   # - data/translation/flores_en2ja
   # - data/translation/flores_zh2ja
   # - data/translation/flores_zh2hr
@@ -18,16 +32,20 @@ evaluate:
   val_size: 4096
   num_proc: null
   metrics:
-    - sentenceBLEU
+    # - sentenceBLEU
     - BLEU
+    # - chrFpp
+    # - spBLEU
+    - comet-22
     - cometkiwi
     - BLEURT
+    # - xcomet-xl
   metrics_args:
     ignore_columns: [0]
   eval_func: recheck
   eval_func_args:
     check_num: 1
-    use_thinking: true
+    use_thinking: false
     use_thinking_prompts: false
   merge_strategy: total
 
@@ -41,12 +59,11 @@ llm:
     tokenizer: /home/nfs05/shenyz/models/Qwen3-0.6B
     trust_remote_code: true
     dtype: bfloat16
-    gpu_memory_utilization: 0.8
+    gpu_memory_utilization: 0.7
     tensor_parallel_size: 4
     seed: 42
     enable_chunked_prefill: false 
     enable_prefix_caching: false
-    max_model_len: 16384
 
 tokenize_args:
   enable_thinking: false
@@ -57,7 +74,7 @@ generate_params:
   offline:
     use_beam_search: false
     sampling_params:
-      max_tokens: 8196
+      max_tokens: 512
       # top_k: 20
       # top_p: 0.95
       temperature: 0.6
@@ -73,5 +90,5 @@ generate_params:
 
 
 save_outputs: true # save format: jsonl
-outputs_dir: ./outputs/trained/
+outputs_dir: ./outputs/main/
 

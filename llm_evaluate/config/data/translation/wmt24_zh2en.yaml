@@ -8,7 +8,8 @@ generate_args:
     source_lang: auto
     target_lang: Chinese
 dataset_args:
-  src_key: source
-  tgt_key: target
+  src_key: target
+  tgt_key: source
+  reverse: true
 save: true
 data_tag: wmt24

@@ -184,6 +184,10 @@ class AsyncCausalLLM(CausalLLM):
         # new_args need to be the content of "generate_args"
 
         self.sampling_params.setdefault("extra_body", {}).update(new_args)
+
+    def get_sampling_params(self) -> dict:
+        return self.sampling_params
+    
     def update_sampling_params(self, backup: dict) -> None:
         self.sampling_params = backup
 

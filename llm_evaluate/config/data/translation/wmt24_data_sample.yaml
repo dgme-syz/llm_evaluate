@@ -1,5 +1,5 @@
 name: dummy
-data_path: "/home/nfs05/shenyz/llm_evaluate/outputs/trained/Qwen3-4B/wmt24_en-zh_CN_base_no_args.jsonl"
+data_path: "/home/nfs05/shenyz/llm_evaluate/outputs/trained/Qwen3-0.6B-mt-zero/wmt24_en-zh_CN_recheck_check_num_0_use_thinking_true_use_thinking_prompts_false_.jsonl"
 subset_name: null
 split: train
 num_samples: null
