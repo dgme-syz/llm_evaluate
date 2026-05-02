@@ -1,5 +1,5 @@
 name: wmt24
-data_path: wmt24/
+data_path: <local-dir>  # download from https://box.nju.edu.cn/d/6de5478fea1544f2b3f4/ and point this at the extracted folder
 subset_name: en-tr_TR
 split: train
 num_samples: null

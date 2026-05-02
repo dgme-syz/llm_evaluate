@@ -1,37 +1,49 @@
+from __future__ import annotations
+
 from typing import Callable
 
-from .abstract import EvalFunc 
+from .abstract import EvalFunc
 
 EVAL_REGISTRY: dict[str, EvalFunc] = {}
 
-# register a metric func
-def register(name: str) -> Callable[[EvalFunc], EvalFunc]:
-    """Decorator to register a metric function with a given name.
+
+def register(
+    name: str,
+    overwrite: bool = False,
+) -> Callable[[EvalFunc], EvalFunc]:
+    """Decorator to register an eval function under ``name``.
 
     Args:
-        name (str): The name to register the eval function under.
-
-    Returns:
-        Callable[[Callable], Callable]: A decorator that registers the eval function.
+        name: Lookup key referenced by ``evaluate.eval_func`` in the master config.
+        overwrite: If False (default), raise when ``name`` is already registered.
     """
-    def decorator(func: Callable) -> Callable:
-        if name in EVAL_REGISTRY:
+
+    def decorator(func: EvalFunc) -> EvalFunc:
+        if not overwrite and name in EVAL_REGISTRY:
             raise ValueError(f"Eval function '{name}' is already registered.")
         EVAL_REGISTRY[name] = func
         return func
+
     return decorator
 
-from typing import Callable, Union, List, Dict
 
 def get_eval(name: str) -> EvalFunc:
-    """Retrieve one or more registered eval functions by name.
+    """Retrieve a registered eval function by name.
 
     Args:
-        names (str or list of str): The name(s) of the eval function(s) to retrieve.
+        name: Name of the eval function to retrieve.
 
     Returns:
-        dict: A dictionary mapping eval function name to registered eval function.
+        The registered eval function.
+
+    Raises:
+        ValueError: If ``name`` is not registered. The error lists every
+            currently registered eval function to aid debugging.
     """
     if name not in EVAL_REGISTRY:
-        raise ValueError(f"Eval function '{name}' is not registered.")
+        available = ", ".join(sorted(EVAL_REGISTRY.keys()))
+        raise ValueError(
+            f"Eval function '{name}' is not registered. "
+            f"Available eval functions: [{available}]."
+        )
     return EVAL_REGISTRY[name]

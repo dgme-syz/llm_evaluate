@@ -1,5 +1,5 @@
 name: challenge_set
-data_path: /home/nfs06/shenyz/data/seed_x_challenge_set
+data_path: <local-dir>  # download from https://box.nju.edu.cn/d/d9dc4055cd2743368ac4/ and point this at the extracted folder
 subset_name: zh_CN-en
 split: train
 num_samples: null

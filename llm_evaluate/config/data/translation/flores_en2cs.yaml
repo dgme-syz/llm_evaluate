@@ -1,7 +1,7 @@
 name: flores
 data_path:
-  - /home/nfs06/shenyz/data/BenchMAX_General_Translation
-  - /home/nfs06/shenyz/data/BenchMAX_General_Translation
+  - LLaMAX/BenchMAX_General_Translation
+  - LLaMAX/BenchMAX_General_Translation
 subset_name:
   - flores_en
   - flores_cs

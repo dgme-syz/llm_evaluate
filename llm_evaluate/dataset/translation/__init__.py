@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Callable, Any
 from collections import OrderedDict
 
@@ -300,7 +301,7 @@ Assistant:
 
 
 
-PROMPT_TEMPLATE = OrderedDict[str, Callable](
+PROMPT_TEMPLATE: "OrderedDict[str, Callable[[str, str, str], Any]]" = OrderedDict(
     [
         ("qwen_chat_mt", qwen_chat_input),
         ("qwen_think_mt", qwen_think_input),
@@ -313,24 +314,58 @@ PROMPT_TEMPLATE = OrderedDict[str, Callable](
     ]
 )
 
-def get_prompt_template(template_name: str) -> Callable[[str, str, str], Any]:
-    """
-    Retrieve the corresponding prompt template function by name.
+
+def register_prompt_template(
+    name: str,
+    func: Callable[[str, str, str], Any],
+    overwrite: bool = False,
+) -> None:
+    """Register a new prompt template at runtime.
 
     Args:
-        template_name (str): The name of the template.
+        name: Identifier used by ``get_prompt_template`` and the ``llm.prompt_template``
+            / ``server.prompt_template`` config fields.
+        func: A callable ``(src_lang_name, tgt_lang_name, src_text) -> messages``.
+        overwrite: If False (default), raise when ``name`` already exists.
+    """
+    if not overwrite and name in PROMPT_TEMPLATE:
+        raise ValueError(f"Prompt template '{name}' is already registered.")
+    PROMPT_TEMPLATE[name] = func
+
+
+def get_prompt_template(template_name: str) -> Callable[[str, str, str], Any]:
+    """Retrieve the prompt-template function by name.
+
+    Args:
+        template_name: The name of the template.
 
     Returns:
-        Callable: The function corresponding to the specified template name.
-            Parameters:
-            src_lang_name (str): The source language name.
-            tgt_lang_name (str): The target language name.
-            src_text (str): The source text to be processed.
+        The callable ``(src_lang_name, tgt_lang_name, src_text) -> messages``.
 
     Raises:
-        ValueError: If the template name does not exist in the `PROMPT_TEMPLATE` dictionary.
+        ValueError: If ``template_name`` is not registered. The error lists all
+            currently available template names to aid debugging.
     """
     if template_name not in PROMPT_TEMPLATE:
-        raise ValueError(f"Template {template_name} not found in prompt templates. Please check the name and try again.")
+        available = ", ".join(PROMPT_TEMPLATE.keys())
+        raise ValueError(
+            f"Prompt template '{template_name}' is not registered. "
+            f"Available templates: [{available}]."
+        )
 
     return PROMPT_TEMPLATE[template_name]
+
+
+def resolve_lang_name(code: str) -> str:
+    """Resolve a language or locale code to a human-readable name.
+
+    Lookup order:
+        1. ``LANGUAGE_BY_CODE`` (locale-aware, e.g. ``zh_CN`` -> ``"Chinese (Simplified)"``).
+        2. ``LANG_DICT`` on the bare language code after stripping the region suffix
+           (e.g. ``"en_XX"`` -> ``"en"`` -> ``"English"``).
+        3. The original ``code`` as a last-resort fallback so callers never crash.
+    """
+    if code in LANGUAGE_BY_CODE:
+        return LANGUAGE_BY_CODE[code]
+    base = code.split("_")[0]
+    return LANG_DICT.get(base, code)

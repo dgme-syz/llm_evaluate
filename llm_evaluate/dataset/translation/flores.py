@@ -1,50 +1,50 @@
 from llm_evaluate.dataset import EvalDataset, register
-from llm_evaluate.dataset.translation import LANG_DICT  # Mapping from language codes to language names
-from llm_evaluate.dataset.translation import get_prompt_template
-#   name: flores        
-#   data_path: 
-#     - /home/nfs06/shenyz/data/BenchMAX_General_Translation
-#     - /home/nfs06/shenyz/data/BenchMAX_General_Translation
-#   subset_name:
-#     - flores_en
-#     - flores_ja
-#   split:
-#     - train
-#     - train
-#   num_samples: null
+from llm_evaluate.dataset.translation import (
+    LANG_DICT,
+    get_prompt_template,
+    resolve_lang_name,
+)
 
 
 @register("flores")
 class flores(EvalDataset):
-    """
-    Dataset class for FLORES translation evaluation.
+    """Dataset wrapper for the FLORES parallel translation evaluation set.
 
-    It constructs a prompt for translation tasks and returns structured items
-    compatible with LLM evaluation pipelines.
+    Expects two parallel sources (one per language). Builds a prompt via the
+    shared template registry and emits items compatible with the LLM evaluation
+    pipeline.
     """
 
     def __init__(self, data_dir, subset_name=None, split="train", builder=None, extra_args=None):
-        """
-        Initialize the FLORES dataset wrapper.
+        """Initialize the FLORES dataset wrapper.
 
         Args:
-            data_dir (str): Directory containing the dataset.
-            subset_name (tuple[str, str], optional): Source and target language codes, e.g., ('en_XX', 'zh_CN').
-            split (str, optional): Dataset split to load ('train', 'test', etc.).
-            builder (callable, optional): Custom dataset builder.
+            data_dir: Directory or list of directories containing the parallel data.
+            subset_name: Tuple/list of two subset names ``(source_subset, target_subset)``,
+                e.g. ``("flores_en", "flores_zh")``.
+            split: Dataset split to load (``"train"``, ``"test"``, ...).
+            builder: Optional custom dataset builder.
+            extra_args: Additional dataset arguments. Must contain ``prompt_template``.
         """
         super().__init__(data_dir, subset_name, split, builder)
 
-        # Extract source and target languages safely
-        src_code, tgt_code = subset_name
-        self.src_lang = LANG_DICT.get(src_code.split("_")[-1], src_code)
-        self.tgt_lang = LANG_DICT.get(tgt_code.split("_")[-1], tgt_code)
-        self.src_code = src_code.split("_")[-1]
-        self.tgt_code = tgt_code.split("_")[-1]
         self.extra_args = extra_args or {}
         if "prompt_template" not in self.extra_args:
-            raise ValueError("This dataset must need a standart prompt template.")
-        self.template_func = get_prompt_template(self.extra_args.get("prompt_template"))
+            raise ValueError(
+                "flores dataset requires `prompt_template` in extra_args "
+                "(set llm.prompt_template / server.prompt_template in the master config)."
+            )
+
+        if subset_name is None or len(subset_name) != 2:
+            raise ValueError(
+                f"flores expects subset_name of length 2 (source, target), got {subset_name!r}."
+            )
+        src_code, tgt_code = subset_name
+        self.src_code = src_code.split("_")[-1]
+        self.tgt_code = tgt_code.split("_")[-1]
+        self.src_lang = LANG_DICT.get(self.src_code, src_code)
+        self.tgt_lang = LANG_DICT.get(self.tgt_code, tgt_code)
+        self.template_func = get_prompt_template(self.extra_args["prompt_template"])
 
     def convert_item(self, examples: list, **kwargs) -> dict:
         """
